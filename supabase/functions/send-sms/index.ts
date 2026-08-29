@@ -27,41 +27,51 @@ serve(async (req) => {
       )
     }
 
-    const apiKey = Deno.env.get('ALIGO_API_KEY')
-    const userId = Deno.env.get('ALIGO_USER_ID')
-    const sender = Deno.env.get('ALIGO_SENDER')
+    const apiKey = Deno.env.get('ALIMTALK_API_KEY')
+    const apiSecret = Deno.env.get('ALIMTALK_API_SECRET')
+    const senderKey = Deno.env.get('ALIMTALK_SENDER_KEY')
 
-    if (!apiKey || !userId || !sender) {
+    if (!apiKey || !apiSecret || !senderKey) {
       return new Response(
         JSON.stringify({ error: '서버 환경변수가 설정되지 않았습니다.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const results = []
-    for (const phone of recipients) {
-      const digits = String(phone).replace(/\D/g, '')
-      if (!digits) continue
+    const validRecipients = recipients
+      .map((p: unknown) => String(p).replace(/\D/g, ''))
+      .filter(Boolean)
 
-      const body = new URLSearchParams()
-      body.append('key', apiKey)
-      body.append('user_id', userId)
-      body.append('sender', sender)
-      body.append('receiver', digits)
-      body.append('msg', message)
-      body.append('msg_type', 'SMS')
-
-      const res = await fetch('https://apis.aligo.in/send/', {
-        method: 'POST',
-        body,
-      })
-
-      const result = await res.json()
-      results.push({ phone: digits, result })
+    if (validRecipients.length === 0) {
+      return new Response(
+        JSON.stringify({ error: '유효한 전화번호가 없습니다.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
+    const credentials = btoa(`${apiKey}:${apiSecret}`)
+
+    const res = await fetch('https://api.coolsms.co.kr/kakao/v4/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messages: validRecipients.map((phone) => ({
+          to: phone,
+          text: message,
+          kakaoOptions: {
+            pfId: senderKey,
+          },
+        })),
+      }),
+    })
+
+    const result = await res.json()
+
     return new Response(
-      JSON.stringify({ success: true, sent: results.length, results }),
+      JSON.stringify({ success: true, sent: validRecipients.length, result }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (err) {
