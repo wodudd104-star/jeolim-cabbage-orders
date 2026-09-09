@@ -1,8 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { load, save } from '../lib/storage';
-import { updateServerAuth } from '../lib/api';
+import {
+  activateUser,
+  deactivateUser,
+  deleteUser,
+  fetchUsers,
+  updateServerAuth,
+} from '../lib/api';
 
-const AUTH_KEY = 'jeolim-cabbage-auth-v1';
+const AUTH_USER_KEY = 'jeolim-auth-user-v1';
 const ORDERS_KEY = 'jeolim-cabbage-orders-v3';
 const CUSTOMERS_KEY = 'jeolim-cabbage-customers-v1';
 const PRODUCTS_KEY = 'jeolim-cabbage-products-v1';
@@ -13,16 +19,16 @@ export type AdminAuth = {
   email: string;
 };
 
-export function getStoredCredentials(): AdminAuth {
-  return load(AUTH_KEY, { id: 'admin', password: '0000', email: '' });
+export function getStoredUser() {
+  return load(AUTH_USER_KEY, null);
 }
 
-export function setStoredCredentials(credentials: AdminAuth) {
-  save(AUTH_KEY, credentials);
+export function setStoredUser(user: { id: string; role: string; email: string }) {
+  save(AUTH_USER_KEY, user);
 }
 
 export default function Admin() {
-  const [currentId, setCurrentId] = useState('');
+  const [currentUser] = useState(() => getStoredUser() || { id: '', role: 'admin', email: '' });
   const [currentPassword, setCurrentPassword] = useState('');
   const [newId, setNewId] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -30,12 +36,36 @@ export default function Admin() {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
 
+  const [users, setUsers] = useState<
+    { id: string; email: string; role: string; active: boolean; createdAt: string }[]
+  >([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  useEffect(() => {
+    loadUserList();
+  }, []);
+
+  async function loadUserList() {
+    setLoadingUsers(true);
+    try {
+      const list = await fetchUsers();
+      setUsers(list);
+    } catch (err: any) {
+      setMessage(err.message || '사용자 목록을 불러오지 못했습니다.');
+    } finally {
+      setLoadingUsers(false);
+    }
+  }
+
   async function handleCredentialsChange(e: React.FormEvent) {
     e.preventDefault();
     setMessage('');
-    const auth = getStoredCredentials();
-    if (currentId !== auth.id || currentPassword !== auth.password) {
-      setMessage('현재 아이디 또는 비밀번호가 틀렸습니다.');
+    if (!currentUser) {
+      setMessage('로그인 정보가 없습니다.');
+      return;
+    }
+    if (!currentPassword.trim()) {
+      setMessage('현재 비밀번호를 입력해주세요.');
       return;
     }
     if (!newId.trim()) {
@@ -56,17 +86,40 @@ export default function Admin() {
     }
 
     try {
-      await updateServerAuth(currentId, currentPassword, newId, newPassword, email);
-      setStoredCredentials({ id: newId, password: newPassword, email });
-      setCurrentId('');
+      await updateServerAuth(currentUser.id, currentPassword, newId, newPassword, email);
+      setStoredUser({ id: newId, role: currentUser.role, email });
       setCurrentPassword('');
       setNewId('');
       setNewPassword('');
       setConfirmPassword('');
       setEmail('');
       setMessage('아이디, 비밀번호, 이메일이 변경되었습니다.');
+      loadUserList();
     } catch (err: any) {
       setMessage(err.message || '서버 연동 중 오류가 발생했습니다.');
+    }
+  }
+
+  async function toggleActive(user: typeof users[number]) {
+    try {
+      if (user.active) {
+        await deactivateUser(user.id);
+      } else {
+        await activateUser(user.id);
+      }
+      loadUserList();
+    } catch (err: any) {
+      setMessage(err.message || '상태 변경 실패');
+    }
+  }
+
+  async function removeUser(user: typeof users[number]) {
+    if (!confirm(`'${user.id}' 계정을 삭제할까요?`)) return;
+    try {
+      await deleteUser(user.id);
+      loadUserList();
+    } catch (err: any) {
+      setMessage(err.message || '삭제 실패');
     }
   }
 
@@ -96,16 +149,6 @@ export default function Admin() {
       <section className='panel'>
         <h2>아이디 / 비밀번호 / 이메일 변경</h2>
         <form onSubmit={handleCredentialsChange} className='admin-form'>
-          <label>
-            현재 아이디
-            <input
-              type='text'
-              className='input'
-              value={currentId}
-              onChange={(e) => setCurrentId(e.target.value)}
-              placeholder='현재 아이디'
-            />
-          </label>
           <label>
             현재 비밀번호
             <input
@@ -161,6 +204,58 @@ export default function Admin() {
             변경 저장
           </button>
         </form>
+      </section>
+
+      <section className='panel'>
+        <div className='admin-section-header'>
+          <h2>회원 관리</h2>
+          <button className='btn' onClick={loadUserList} disabled={loadingUsers}>
+            {loadingUsers ? '불러오는 중...' : '새로고침'}
+          </button>
+        </div>
+        <p className='panel-hint'>
+          회원가입한 사용자는 기본적으로 비활성화 상태입니다. 관리자가 승인(활성화)해야
+          로그인할 수 있습니다.
+        </p>
+
+        {users.length === 0 ? (
+          <div className='empty'>등록된 회원이 없습니다.</div>
+        ) : (
+          <div className='user-list'>
+            {users.map((user) => (
+              <div key={user.id} className={`user-row ${user.active ? 'active' : 'inactive'}`}>
+                <div className='user-info'>
+                  <span className='user-id'>{user.id}</span>
+                  <span className='user-email'>{user.email}</span>
+                  <span className={`tag ${user.role === 'admin' ? 'highlight' : ''}`}>
+                    {user.role === 'admin' ? '관리자' : '사용자'}
+                  </span>
+                  <span className={`tag ${user.active ? 'payment-완납' : 'payment-미납'}`}>
+                    {user.active ? '활성' : '비활성'}
+                  </span>
+                </div>
+                <div className='user-actions'>
+                  {user.role !== 'admin' && (
+                    <button
+                      className={`btn ${user.active ? '' : 'btn-primary'}`}
+                      onClick={() => toggleActive(user)}
+                    >
+                      {user.active ? '비활성화' : '활성화'}
+                    </button>
+                  )}
+                  {user.role !== 'admin' && (
+                    <button
+                      className='btn icon danger'
+                      onClick={() => removeUser(user)}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className='panel danger-panel'>

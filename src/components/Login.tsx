@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { load, save } from '../lib/storage';
 import {
-  fetchAuthInfo,
   findIdByEmail,
+  login,
   registerAccount,
   resetPassword,
   sendResetCode,
@@ -10,11 +10,11 @@ import {
 
 const AUTH_SESSION_KEY = 'jeolim-auth-session';
 const AUTH_ROLE_KEY = 'jeolim-auth-role';
-const AUTH_KEY = 'jeolim-cabbage-auth-v1';
+const AUTH_USER_KEY = 'jeolim-auth-user-v1';
 
-export type AuthCredentials = {
+export type AuthUser = {
   id: string;
-  password: string;
+  role: string;
   email: string;
 };
 
@@ -25,14 +25,15 @@ export function isLoggedIn() {
 export function logout() {
   sessionStorage.removeItem(AUTH_SESSION_KEY);
   sessionStorage.removeItem(AUTH_ROLE_KEY);
+  sessionStorage.removeItem(AUTH_USER_KEY);
 }
 
-export function getStoredCredentials(): AuthCredentials {
-  return load(AUTH_KEY, { id: 'admin', password: '0000', email: '' });
+export function getStoredUser(): AuthUser | null {
+  return load(AUTH_USER_KEY, null);
 }
 
-export function setStoredCredentials(auth: AuthCredentials) {
-  save(AUTH_KEY, auth);
+export function setStoredUser(user: AuthUser) {
+  save(AUTH_USER_KEY, user);
 }
 
 export function isAdmin(): boolean {
@@ -80,21 +81,17 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
     setNewPasswordConfirm('');
   }
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     resetMessages();
-    const auth = getStoredCredentials();
-    if (id === auth.id && password === auth.password) {
+    try {
+      const user = await login(id, password);
       sessionStorage.setItem(AUTH_SESSION_KEY, '1');
-      fetchAuthInfo().then((info) => {
-        sessionStorage.setItem(AUTH_ROLE_KEY, info?.role === 'admin' ? 'admin' : 'user');
-      }).catch(() => {
-        sessionStorage.setItem(AUTH_ROLE_KEY, 'admin');
-      }).finally(() => {
-        onLogin();
-      });
-    } else {
-      setError('아이디 또는 비밀번호가 틀렸습니다.');
+      sessionStorage.setItem(AUTH_ROLE_KEY, user.role === 'admin' ? 'admin' : 'user');
+      setStoredUser({ id: user.id, role: user.role, email: user.email });
+      onLogin();
+    } catch (err: any) {
+      setError(err.message || '로그인 중 오류가 발생했습니다.');
     }
   }
 
@@ -118,13 +115,12 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
       return;
     }
     try {
-      await registerAccount(signupId, signupPassword, signupEmail);
-      setStoredCredentials({
-        id: signupId,
-        password: signupPassword,
-        email: signupEmail,
-      });
-      setSuccess('회원가입이 완료되었습니다. 로그인해주세요.');
+      const data = await registerAccount(signupId, signupPassword, signupEmail);
+      if (data.role === 'admin' && data.active) {
+        setSuccess('관리자 회원가입이 완료되었습니다. 로그인해주세요.');
+      } else {
+        setSuccess('회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인 가능합니다.');
+      }
       setMode('login');
       setId(signupId);
       setSignupId('');
@@ -177,11 +173,6 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
     }
     try {
       await resetPassword(findEmail, code, newPassword);
-      setStoredCredentials({
-        id: getStoredCredentials().id,
-        password: newPassword,
-        email: findEmail,
-      });
       setSuccess('비밀번호가 재설정되었습니다. 로그인해주세요.');
       setMode('login');
       setFindEmail('');
@@ -193,9 +184,6 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
       setError(err.message || '비밀번호 재설정 중 오류가 발생했습니다.');
     }
   }
-
-  const auth = getStoredCredentials();
-  const hasAccount = auth.id !== 'admin' || auth.password !== '0000' || auth.email;
 
   return (
     <div className='login-overlay'>
@@ -258,12 +246,6 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
 
         {mode === 'signup' && (
           <form onSubmit={handleSignup}>
-            {hasAccount && (
-              <p className='login-warning'>
-                ⚠ 이미 등록된 계정이 있습니다. 새로 가입하면 기존 계정이
-                교첵됩니다.
-              </p>
-            )}
             <input
               type='text'
               className='input'
@@ -407,7 +389,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
         <p className='login-hint'>
           {mode === 'login'
             ? '초기 아이디: admin / 비밀번호: 0000'
-            : '모든 정보는 이 브라우저와 서버에 저장됩니다.'}
+            : '모든 정보는 서버에 안전하게 저장됩니다.'}
         </p>
       </div>
     </div>

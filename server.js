@@ -21,18 +21,46 @@ async function ensureDataDir() {
   await fs.mkdir(path.dirname(AUTH_FILE), { recursive: true });
 }
 
-async function loadServerAuth() {
+async function loadAuthData() {
   try {
     const raw = await fs.readFile(AUTH_FILE, 'utf-8');
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    // 구버전 단일 계정 형식 마이그레이션
+    if (Array.isArray(parsed.users)) return parsed;
+    if (parsed.id) {
+      return {
+        users: [
+          {
+            id: parsed.id,
+            email: parsed.email || '',
+            salt: parsed.salt,
+            hash: parsed.hash,
+            role: parsed.role || 'admin',
+            active: true,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      };
+    }
+    return { users: [] };
   } catch {
-    return null;
+    return { users: [] };
   }
 }
 
-async function saveServerAuth(auth) {
+async function saveAuthData(data) {
   await ensureDataDir();
-  await fs.writeFile(AUTH_FILE, JSON.stringify(auth, null, 2));
+  await fs.writeFile(AUTH_FILE, JSON.stringify(data, null, 2));
+}
+
+async function findUserById(id) {
+  const data = await loadAuthData();
+  return data.users.find((u) => u.id === id) || null;
+}
+
+async function findUsersByEmail(email) {
+  const data = await loadAuthData();
+  return data.users.filter((u) => u.email === email);
 }
 
 function hashPassword(password) {
@@ -68,7 +96,6 @@ function generateCode(email) {
 function verifyCode(email, code) {
   const current = generateCode(email);
   if (code.toUpperCase() === current) return true;
-  // 이전 30분 슬롯도 허용
   const secret = process.env.EMAIL_CODE_SECRET || 'jeolim-cabbage-secret';
   const prevSlot = Math.floor(Date.now() / (1000 * 60 * 30)) - 1;
   const prev = crypto
@@ -87,29 +114,121 @@ async function sendEmail(to, subject, text) {
   await transporter.sendMail({ from, to, subject, text });
 }
 
+app.post('/api/login', async (req, res) => {
+  const { id, password } = req.body;
+  if (!id || !password) {
+    return res.status(400).json({ error: '아이디와 비밀번호를 입력해주세요.' });
+  }
+
+  const data = await loadAuthData();
+
+  // 서버에 계정이 하나도 없으면 기본 관리자 로그인 허용
+  if (data.users.length === 0) {
+    if (id === 'admin' && password === '0000') {
+      return res.json({ id: 'admin', role: 'admin', active: true });
+    }
+  }
+
+  const user = await findUserById(id);
+  if (!user) {
+    return res.status(401).json({ error: '아이디 또는 비밀번호가 틀렸습니다.' });
+  }
+  if (!verifyPassword(password, user.salt, user.hash)) {
+    return res.status(401).json({ error: '아이디 또는 비밀번호가 틀렸습니다.' });
+  }
+  if (!user.active) {
+    return res.status(403).json({ error: '계정이 비활성화되었습니다. 관리자에게 문의하세요.' });
+  }
+  res.json({ id: user.id, role: user.role, active: user.active, email: user.email });
+});
+
 app.post('/api/register', async (req, res) => {
   const { id, password, email } = req.body;
   if (!id || !password || !email) {
     return res.status(400).json({ error: '아이디, 비밀번호, 이메일을 모두 입력해주세요.' });
   }
-  const existing = await loadServerAuth();
-  const role = existing ? 'user' : 'admin';
+
+  const data = await loadAuthData();
+  if (data.users.some((u) => u.id === id)) {
+    return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
+  }
+  if (data.users.some((u) => u.email === email)) {
+    return res.status(409).json({ error: '이미 사용 중인 이메일입니다.' });
+  }
+
+  const isFirst = data.users.length === 0;
   const { salt, hash } = hashPassword(password);
-  await saveServerAuth({ id, salt, hash, email, role });
-  res.json({ success: true, role });
+  const newUser = {
+    id,
+    email,
+    salt,
+    hash,
+    role: isFirst ? 'admin' : 'user',
+    active: isFirst,
+    createdAt: new Date().toISOString(),
+  };
+  data.users.push(newUser);
+  await saveAuthData(data);
+  res.json({ success: true, role: newUser.role, active: newUser.active });
+});
+
+app.get('/api/users', async (_req, res) => {
+  const data = await loadAuthData();
+  const users = data.users.map((u) => ({
+    id: u.id,
+    email: u.email,
+    role: u.role,
+    active: u.active,
+    createdAt: u.createdAt,
+  }));
+  res.json(users);
+});
+
+app.post('/api/users/:id/activate', async (req, res) => {
+  const data = await loadAuthData();
+  const user = data.users.find((u) => u.id === req.params.id);
+  if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+  user.active = true;
+  await saveAuthData(data);
+  res.json({ success: true });
+});
+
+app.post('/api/users/:id/deactivate', async (req, res) => {
+  const data = await loadAuthData();
+  const user = data.users.find((u) => u.id === req.params.id);
+  if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+  if (user.role === 'admin') {
+    return res.status(403).json({ error: '관리자 계정은 비활성화할 수 없습니다.' });
+  }
+  user.active = false;
+  await saveAuthData(data);
+  res.json({ success: true });
+});
+
+app.delete('/api/users/:id', async (req, res) => {
+  const data = await loadAuthData();
+  const idx = data.users.findIndex((u) => u.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+  if (data.users[idx].role === 'admin') {
+    return res.status(403).json({ error: '관리자 계정은 삭제할 수 없습니다.' });
+  }
+  data.users.splice(idx, 1);
+  await saveAuthData(data);
+  res.json({ success: true });
 });
 
 app.post('/api/find-id', async (req, res) => {
   const { email } = req.body;
-  const auth = await loadServerAuth();
-  if (!auth || auth.email !== email) {
+  const users = await findUsersByEmail(email);
+  if (users.length === 0) {
     return res.status(404).json({ error: '등록된 이메일이 없습니다.' });
   }
   try {
+    const ids = users.map((u) => u.id).join(', ');
     await sendEmail(
-      auth.email,
+      email,
       '[절임배추 관리] 아이디 안내',
-      `안녕하세요.\n\n요청하신 아이디는 "${auth.id}" 입니다.\n\n감사합니다.`
+      `안녕하세요.\n\n요청하신 아이디는 "${ids}" 입니다.\n\n감사합니다.`
     );
     res.json({ success: true });
   } catch (err) {
@@ -119,14 +238,14 @@ app.post('/api/find-id', async (req, res) => {
 
 app.post('/api/send-reset-code', async (req, res) => {
   const { email } = req.body;
-  const auth = await loadServerAuth();
-  if (!auth || auth.email !== email) {
+  const users = await findUsersByEmail(email);
+  if (users.length === 0) {
     return res.status(404).json({ error: '등록된 이메일이 없습니다.' });
   }
   const code = generateCode(email);
   try {
     await sendEmail(
-      auth.email,
+      email,
       '[절임배추 관리] 비밀번호 재설정 인증번호',
       `안녕하세요.\n\n비밀번호 재설정 인증번호는 "${code}" 입니다.\n\n30분 이내에 입력해주세요.`
     );
@@ -138,41 +257,50 @@ app.post('/api/send-reset-code', async (req, res) => {
 
 app.post('/api/reset-password', async (req, res) => {
   const { email, code, newPassword } = req.body;
-  const auth = await loadServerAuth();
-  if (!auth || auth.email !== email) {
+  const users = await findUsersByEmail(email);
+  if (users.length === 0) {
     return res.status(404).json({ error: '등록된 이메일이 없습니다.' });
   }
   if (!verifyCode(email, code)) {
     return res.status(400).json({ error: '인증번호가 올바르지 않거나 만료되었습니다.' });
   }
+  const data = await loadAuthData();
   const { salt, hash } = hashPassword(newPassword);
-  await saveServerAuth({ ...auth, salt, hash });
+  data.users = data.users.map((u) => {
+    if (u.email !== email) return u;
+    return { ...u, salt, hash };
+  });
+  await saveAuthData(data);
   res.json({ success: true });
 });
 
 app.post('/api/update-auth', async (req, res) => {
   const { currentId, currentPassword, newId, newPassword, email } = req.body;
-  const auth = await loadServerAuth();
-  if (!auth) {
+  const data = await loadAuthData();
+  const user = data.users.find((u) => u.id === currentId);
+  if (!user) {
     return res.status(400).json({ error: '서버에 등록된 계정이 없습니다.' });
   }
-  if (currentId !== auth.id || !verifyPassword(currentPassword, auth.salt, auth.hash)) {
+  if (!verifyPassword(currentPassword, user.salt, user.hash)) {
     return res.status(403).json({ error: '현재 아이디 또는 비밀번호가 틀렸습니다.' });
   }
-  const next = { ...auth, id: newId || auth.id, email: email || auth.email };
+  if (newId && newId !== currentId && data.users.some((u) => u.id === newId)) {
+    return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
+  }
+  if (email && email !== user.email && data.users.some((u) => u.email === email)) {
+    return res.status(409).json({ error: '이미 사용 중인 이메일입니다.' });
+  }
+
+  const idx = data.users.findIndex((u) => u.id === currentId);
+  if (newId) data.users[idx].id = newId;
+  if (email) data.users[idx].email = email;
   if (newPassword) {
     const { salt, hash } = hashPassword(newPassword);
-    next.salt = salt;
-    next.hash = hash;
+    data.users[idx].salt = salt;
+    data.users[idx].hash = hash;
   }
-  await saveServerAuth(next);
-  res.json({ success: true, id: next.id });
-});
-
-app.get('/api/auth-info', async (_req, res) => {
-  const auth = await loadServerAuth();
-  if (!auth) return res.json(null);
-  res.json({ id: auth.id, email: auth.email, role: auth.role || 'admin' });
+  await saveAuthData(data);
+  res.json({ success: true, id: data.users[idx].id });
 });
 
 function getAuthHeader(apiKey, apiSecret) {

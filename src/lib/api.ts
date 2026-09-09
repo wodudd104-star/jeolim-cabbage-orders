@@ -18,11 +18,15 @@ export async function sendSms(recipients: string[], message: string) {
   return data;
 }
 
-export async function fetchAuthInfo() {
-  const res = await fetch(getUrl('/api/auth-info'));
+export async function login(id: string, password: string) {
+  const res = await fetch(getUrl('/api/login'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, password }),
+  });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || '인증 정보 조회 실패');
-  return data as { id: string; email: string; role: string } | null;
+  if (!res.ok) throw new Error(data.error || '로그인 실패');
+  return data as { id: string; email: string; role: string; active: boolean };
 }
 
 export async function registerAccount(id: string, password: string, email: string) {
@@ -33,6 +37,40 @@ export async function registerAccount(id: string, password: string, email: strin
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || '회원가입 실패');
+  return data;
+}
+
+export async function fetchUsers() {
+  const res = await fetch(getUrl('/api/users'));
+  const data = await res.json().catch(() => []);
+  if (!res.ok) throw new Error(data.error || '사용자 목록 조회 실패');
+  return data as { id: string; email: string; role: string; active: boolean; createdAt: string }[];
+}
+
+export async function activateUser(id: string) {
+  const res = await fetch(getUrl(`/api/users/${encodeURIComponent(id)}/activate`), {
+    method: 'POST',
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || '활성화 실패');
+  return data;
+}
+
+export async function deactivateUser(id: string) {
+  const res = await fetch(getUrl(`/api/users/${encodeURIComponent(id)}/deactivate`), {
+    method: 'POST',
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || '비활성화 실패');
+  return data;
+}
+
+export async function deleteUser(id: string) {
+  const res = await fetch(getUrl(`/api/users/${encodeURIComponent(id)}`), {
+    method: 'DELETE',
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || '삭제 실패');
   return data;
 }
 
