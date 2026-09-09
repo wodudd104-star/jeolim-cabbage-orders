@@ -77,7 +77,7 @@ serve(async (req) => {
     const signature = await createSignature(apiSecret, date, salt)
     const authHeader = `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`
 
-    const res = await fetch('https://api.coolsms.co.kr/kakao/v4/send', {
+    const res = await fetch('https://api.solapi.com/messages/v4/send', {
       method: 'POST',
       headers: {
         'Authorization': authHeader,

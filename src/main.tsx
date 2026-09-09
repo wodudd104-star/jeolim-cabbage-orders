@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as XLSX from 'xlsx';
 import './style.css';
-import { isSupabaseReady, supabase } from './lib/supabase';
+import { sendSms } from './lib/api';
 
 type OrderStatus = '접수' | '준비중' | '완료' | '취소';
 type PickupType = '매장방문' | '배송';
@@ -846,10 +846,6 @@ function SmsModal({ orders, onClose }: { orders: Order[]; onClose: () => void })
   }
 
   async function sendViaApi() {
-    if (!isSupabaseReady()) {
-      alert('Supabase 연결 정보가 없습니다. .env 파일을 확인하세요.');
-      return;
-    }
     if (selectedOrders.length === 0) {
       alert('수신자를 선택하세요.');
       return;
@@ -862,10 +858,7 @@ function SmsModal({ orders, onClose }: { orders: Order[]; onClose: () => void })
     setSendResult(null);
     try {
       const recipients = selectedOrders.map((o) => o.phone);
-      const { data, error } = await supabase!.functions.invoke('send-sms', {
-        body: { recipients, message: preview },
-      });
-      if (error) throw error;
+      const data = await sendSms(recipients, preview);
       setSendResult(`발송 완료: ${data?.sent || 0}건`);
     } catch (err: any) {
       setSendResult(`발송 실패: ${err.message || '오류 발생'}`);
