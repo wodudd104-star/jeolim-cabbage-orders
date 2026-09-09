@@ -8,6 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const AUTH_FILE = path.join(__dirname, 'data', 'auth.json');
+const AUTH_BACKUP_FILE = path.join(__dirname, 'data', 'members-backup.json');
 const DATABASE_URL = process.env.DATABASE_URL;
 
 let pool = null;
@@ -52,9 +53,25 @@ export function verifyPassword(password, salt, hash) {
 }
 
 async function loadJsonUsers() {
+  let parsed = null;
   try {
     const raw = await fs.readFile(AUTH_FILE, 'utf-8');
-    const parsed = JSON.parse(raw);
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = null;
+  }
+
+  if (!parsed) {
+    try {
+      const raw = await fs.readFile(AUTH_BACKUP_FILE, 'utf-8');
+      parsed = JSON.parse(raw);
+      console.log('Restored users from members-backup.json');
+    } catch {
+      parsed = null;
+    }
+  }
+
+  if (parsed) {
     if (Array.isArray(parsed.users)) return parsed.users;
     if (parsed.id) {
       return [
@@ -69,15 +86,15 @@ async function loadJsonUsers() {
         },
       ];
     }
-    return [];
-  } catch {
-    return [];
   }
+  return [];
 }
 
 async function saveJsonUsers(users) {
   await fs.mkdir(path.dirname(AUTH_FILE), { recursive: true });
-  await fs.writeFile(AUTH_FILE, JSON.stringify({ users }, null, 2));
+  const payload = JSON.stringify({ users }, null, 2);
+  await fs.writeFile(AUTH_FILE, payload);
+  await fs.writeFile(AUTH_BACKUP_FILE, payload);
 }
 
 function rowToUser(row) {

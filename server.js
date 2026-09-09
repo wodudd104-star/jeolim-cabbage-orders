@@ -31,6 +31,24 @@ app.use(express.json());
 const TARGET_ADMIN_ID = 'wodudd102';
 const DEFAULT_ADMIN_PASSWORD = '0000';
 const AUTH_FILE = path.join(__dirname, 'data', 'auth.json');
+const SIGNUP_LOG_FILE = path.join(__dirname, 'data', 'signups.json');
+
+async function appendSignupLog(user) {
+  let list = [];
+  try {
+    const raw = await fs.readFile(SIGNUP_LOG_FILE, 'utf-8');
+    list = JSON.parse(raw);
+    if (!Array.isArray(list)) list = [];
+  } catch {
+    list = [];
+  }
+  list.push({
+    ...user,
+    loggedAt: new Date().toISOString(),
+  });
+  await fs.mkdir(path.dirname(SIGNUP_LOG_FILE), { recursive: true });
+  await fs.writeFile(SIGNUP_LOG_FILE, JSON.stringify(list, null, 2));
+}
 
 async function loadLegacyJsonUsers() {
   try {
@@ -191,14 +209,16 @@ app.post('/api/register', async (req, res) => {
   }
 
   const { salt, hash } = hashPassword(password);
-  await createUser({
+  const newUser = {
     id,
     email,
     salt,
     hash,
     role: 'user',
     active: false,
-  });
+  };
+  await createUser(newUser);
+  await appendSignupLog({ id, email, role: 'user', active: false });
   res.json({ success: true, role: 'user', active: false });
 });
 
