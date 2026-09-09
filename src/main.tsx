@@ -44,6 +44,12 @@ function formatPhone(value: string) {
   return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`;
 }
 
+function getOrderPublicUrl(orderId: string) {
+  const url = new URL(window.location.href);
+  url.search = `?order=${orderId}`;
+  return url.toString();
+}
+
 function getPaymentStatus(order: Order): PaymentStatus {
   if (order.status === '취소') return '완납';
   if (order.depositAmount >= order.totalPrice) return '완납';
@@ -303,12 +309,6 @@ export default function App() {
     } catch (err) {
       alert('주소 검색을 불러오는 중 오류가 발생했습니다.');
     }
-  }
-
-  function getOrderPublicUrl(orderId: string) {
-    const url = new URL(window.location.href);
-    url.search = `?order=${orderId}`;
-    return url.toString();
   }
 
   async function copyOrderUrl(order: Order) {
@@ -782,7 +782,8 @@ function personalizeMessage(template: string, order: Order) {
     .split('{금액}').join(formatCurrency(order.totalPrice))
     .split('{잔액}').join(formatCurrency(balance))
     .split('{입금액}').join(formatCurrency(order.depositAmount))
-    .split('{수령일}').join(formatDate(order.pickupDate));
+    .split('{수령일}').join(formatDate(order.pickupDate))
+    .split('{주문URL}').join(getOrderPublicUrl(order.id));
 }
 
 function Receipt({ order }: { order: Order }) {
@@ -1203,7 +1204,7 @@ function SmsModal({ orders, onClose }: { orders: Order[]; onClose: () => void })
         <div className='sms-section'>
           <div className='sms-section-title'>메시지</div>
           <div className='template-tags'>
-            {['{이름}', '{품목}', '{수량}', '{금액}', '{잔액}', '{입금액}', '{수령일}'].map((tag) => (
+            {['{이름}', '{품목}', '{수량}', '{금액}', '{잔액}', '{입금액}', '{수령일}', '{주문URL}'].map((tag) => (
               <button key={tag} className='btn small tag-btn' onClick={() => applyTemplate(tag)}>
                 {tag}
               </button>
