@@ -90,6 +90,8 @@ export default function App() {
   const [isSmsOpen, setIsSmsOpen] = useState(false);
   const [printOrder, setPrintOrder] = useState<Order | null>(null);
   const [isPostcodeOpen, setIsPostcodeOpen] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [accountNumber, setAccountNumber] = useState(() => getStoredAccountNumber());
   const postcodeWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -410,8 +412,53 @@ export default function App() {
             <button className='btn' onClick={handleLogout}>
               로그아웃
             </button>
+            {isAdmin() && (
+              <button
+                className='btn'
+                onClick={() => setIsAccountModalOpen(true)}
+                title='계좌번호 설정'
+              >
+                🏦 계좌번호
+              </button>
+            )}
           </div>
         </header>
+
+        {isAccountModalOpen && (
+          <div
+            className='modal-overlay'
+            onClick={(e) => e.target === e.currentTarget && setIsAccountModalOpen(false)}
+          >
+            <div className='modal panel'>
+              <div className='modal-header'>
+                <h2>계좌번호 설정</h2>
+                <button className='btn icon' onClick={() => setIsAccountModalOpen(false)}>
+                  ✕
+                </button>
+              </div>
+              <p className='panel-hint'>
+                단체 문자 발송 시 {'{계좌번호}'} 변수에 들어갈 계좌번호를 입력하세요.
+              </p>
+              <label className='input-label'>
+                계좌번호
+                <input
+                  className='input'
+                  value={accountNumber}
+                  onChange={(e) => {
+                    setAccountNumber(e.target.value);
+                    save('jeolim-cabbage-account-number', e.target.value);
+                  }}
+                  placeholder='예: 농협 352-1234-5678-90 홍길동'
+                />
+              </label>
+              <div className='form-actions'>
+                <button className='btn' onClick={() => setIsAccountModalOpen(false)}>
+                  닫기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {page === 'dashboard' ? (
           <Dashboard orders={orders} products={products} />
