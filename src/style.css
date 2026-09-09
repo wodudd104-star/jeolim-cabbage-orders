@@ -334,6 +334,113 @@ h1 {
   border-radius: var(--radius);
 }
 
+.dashboard-summary {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin-bottom: 20px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.dashboard-wide {
+  grid-column: 1 / -1;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.status-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 10px;
+  border-radius: var(--radius);
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.status-box .status-name {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.status-box .status-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.status-box.status-접수 { background: #eff6ff; border-color: #bfdbfe; }
+.status-box.status-준비중 { background: #fffbeb; border-color: #fde68a; }
+.status-box.status-완료 { background: #ecfdf5; border-color: #a7f3d0; }
+.status-box.status-취소 { background: #f3f4f6; border-color: #d1d5db; }
+
+.status-box.payment-미납 { background: #fef2f2; border-color: #fecaca; }
+.status-box.payment-부분납 { background: #fffbeb; border-color: #fde68a; }
+.status-box.payment-완납 { background: #ecfdf5; border-color: #a7f3d0; }
+
+.rank-list,
+.simple-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rank-item,
+.simple-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border-radius: var(--radius);
+}
+
+.rank-number {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.rank-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.rank-value {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+@media (max-width: 640px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-wide {
+    grid-column: auto;
+  }
+}
+
 .order-actions {
   display: flex;
   align-items: center;

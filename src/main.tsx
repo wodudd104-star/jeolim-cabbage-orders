@@ -8,6 +8,7 @@ import { Order, Product, OrderStatus, PickupType, PaymentStatus, Page } from './
 import Login, { isAdmin, isLoggedIn, logout } from './components/Login';
 import Customers from './components/Customers';
 import Admin from './components/Admin';
+import Dashboard from './components/Dashboard';
 
 const STATUS_LIST: OrderStatus[] = ['접수', '준비중', '완료', '취소'];
 const PICKUP_LIST: PickupType[] = ['매장방문', '배송'];
@@ -65,7 +66,7 @@ const emptyOrder: Omit<Order, 'id' | 'createdAt'> = {
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(() => isLoggedIn());
-  const [page, setPage] = useState<Page>('orders');
+  const [page, setPage] = useState<Page>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>(defaultProducts);
   const [filter, setFilter] = useState<OrderStatus | '전체'>('전체');
@@ -280,7 +281,9 @@ export default function App() {
             <div className='brand-text'>
               <p className='eyebrow'>절임배추 관리</p>
               <h1>
-                {page === 'orders'
+                {page === 'dashboard'
+                  ? '대시보드'
+                  : page === 'orders'
                   ? '주문 관리'
                   : page === 'customers'
                   ? '고객 관리'
@@ -290,6 +293,12 @@ export default function App() {
           </button>
           <div className='header-actions'>
             <nav className='nav-tabs'>
+              <button
+                className={`btn ${page === 'dashboard' ? 'active' : ''}`}
+                onClick={() => setPage('dashboard')}
+              >
+                📊 대시보드
+              </button>
               <button
                 className={`btn ${page === 'orders' ? 'active' : ''}`}
                 onClick={() => setPage('orders')}
@@ -337,7 +346,9 @@ export default function App() {
           </div>
         </header>
 
-        {page === 'customers' && isAdmin() ? (
+        {page === 'dashboard' ? (
+          <Dashboard orders={orders} products={products} />
+        ) : page === 'customers' && isAdmin() ? (
           <Customers orders={orders} />
         ) : page === 'admin' && isAdmin() ? (
           <Admin />
