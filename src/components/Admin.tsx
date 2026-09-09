@@ -15,7 +15,7 @@ const AUTH_USER_KEY = 'jeolim-auth-user-v1';
 const ORDERS_KEY = 'jeolim-cabbage-orders-v3';
 const CUSTOMERS_KEY = 'jeolim-cabbage-customers-v1';
 const PRODUCTS_KEY = 'jeolim-cabbage-products-v1';
-const ACCOUNT_NUMBER_KEY = 'jeolim-cabbage-account-number';
+const ACCOUNT_NUMBERS_KEY = 'jeolim-cabbage-account-numbers';
 
 export type AdminAuth = {
   id: string;
@@ -23,16 +23,131 @@ export type AdminAuth = {
   email: string;
 };
 
+export type AccountInfo = {
+  id: string;
+  bank: string;
+  number: string;
+  holder: string;
+};
+
 export function getStoredUser() {
   return load(AUTH_USER_KEY, null);
 }
 
+export function getStoredAccountNumbers(): AccountInfo[] {
+  return load(ACCOUNT_NUMBERS_KEY, []);
+}
+
 export function getStoredAccountNumber(): string {
-  return load(ACCOUNT_NUMBER_KEY, '');
+  const list = getStoredAccountNumbers();
+  if (list.length === 0) return '';
+  return list.map((a) => `${a.bank} ${a.number} ${a.holder}`).join('\n');
 }
 
 export function setStoredUser(user: { id: string; role: string; email: string }) {
   save(AUTH_USER_KEY, user);
+}
+
+export function AccountManager() {
+  const [accounts, setAccounts] = useState<AccountInfo[]>(() => getStoredAccountNumbers());
+  const [isAdding, setIsAdding] = useState(false);
+  const [form, setForm] = useState({ bank: '', number: '', holder: '' });
+
+  function commit(next: AccountInfo[]) {
+    setAccounts(next);
+    save(ACCOUNT_NUMBERS_KEY, next);
+  }
+
+  function addAccount() {
+    if (!form.bank.trim() || !form.number.trim() || !form.holder.trim()) {
+      alert('은행명, 계좌번호, 예금주를 모두 입력해주세요.');
+      return;
+    }
+    const newAccount: AccountInfo = {
+      id: crypto.randomUUID(),
+      bank: form.bank.trim(),
+      number: form.number.trim(),
+      holder: form.holder.trim(),
+    };
+    commit([...accounts, newAccount]);
+    setForm({ bank: '', number: '', holder: '' });
+    setIsAdding(false);
+  }
+
+  function removeAccount(id: string) {
+    if (confirm('이 계좌를 삭제할까요?')) {
+      commit(accounts.filter((a) => a.id !== id));
+    }
+  }
+
+  return (
+    <div className='account-manager'>
+      <div className='account-list'>
+        {accounts.length === 0 ? (
+          <p className='empty'>등록된 계좌가 없습니다.</p>
+        ) : (
+          accounts.map((a) => (
+            <div key={a.id} className='account-item'>
+              <div className='account-info'>
+                <span className='account-bank'>{a.bank}</span>
+                <span className='account-number'>{a.number}</span>
+                <span className='account-holder'>{a.holder}</span>
+              </div>
+              <button className='btn icon danger' onClick={() => removeAccount(a.id)} title='삭제'>
+                ✕
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      {!isAdding ? (
+        <button className='btn btn-primary' onClick={() => setIsAdding(true)}>
+          + 계좌 추가
+        </button>
+      ) : (
+        <div className='account-form'>
+          <div className='form-grid three'>
+            <label>
+              은행
+              <input
+                className='input'
+                value={form.bank}
+                onChange={(e) => setForm({ ...form, bank: e.target.value })}
+                placeholder='농협'
+              />
+            </label>
+            <label>
+              계좌번호
+              <input
+                className='input'
+                value={form.number}
+                onChange={(e) => setForm({ ...form, number: e.target.value })}
+                placeholder='352-1234-5678-90'
+              />
+            </label>
+            <label>
+              예금주
+              <input
+                className='input'
+                value={form.holder}
+                onChange={(e) => setForm({ ...form, holder: e.target.value })}
+                placeholder='홍길동'
+              />
+            </label>
+          </div>
+          <div className='form-actions'>
+            <button className='btn' onClick={() => setIsAdding(false)}>
+              취소
+            </button>
+            <button className='btn btn-primary' onClick={addAccount}>
+              추가
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function Admin() {
@@ -43,7 +158,6 @@ export default function Admin() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
-  const [accountNumber, setAccountNumber] = useState(() => getStoredAccountNumber());
 
   const [users, setUsers] = useState<
     { id: string; email: string; role: string; active: boolean; createdAt: string }[]
@@ -203,24 +317,15 @@ export default function Admin() {
         </div>
       </header>
 
-      <section className='panel'>
-        <h2>계좌번호 설정</h2>
-        <p className='panel-hint'>
-          단체 문자 발송 시 {'{계좌번호}'} 변수에 들어갈 계좌번호를 입력하세요.
-        </p>
-        <div className='admin-form'>
-          <label>
-            계좌번호
-            <input
-              className='input'
-              value={accountNumber}
-              onChange={(e) => {
-                setAccountNumber(e.target.value);
-                save(ACCOUNT_NUMBER_KEY, e.target.value);
-              }}
-              placeholder='예: 농협 352-1234-5678-90 홍길동'
-            />
-          </label>
+      <section className='panel account-panel'>
+        <div className='account-panel-header'>
+          <div>
+            <h2>계좌번호 설정</h2>
+            <p className='panel-hint'>
+              단체 문자 발송 시 {'{계좌번호}'} 변수에 들어갈 계좌번호를 입력하세요.
+            </p>
+          </div>
+          <AccountManager />
         </div>
       </section>
 

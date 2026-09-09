@@ -7,7 +7,7 @@ import { load, save } from './lib/storage';
 import { Order, Product, OrderStatus, PickupType, PaymentStatus, Page } from './types';
 import Login, { isAdmin, isLoggedIn, logout } from './components/Login';
 import Customers from './components/Customers';
-import Admin, { getStoredAccountNumber } from './components/Admin';
+import Admin, { AccountManager, getStoredAccountNumber } from './components/Admin';
 import Dashboard from './components/Dashboard';
 
 const STATUS_LIST: OrderStatus[] = ['접수', '준비중', '완료', '취소'];
@@ -429,7 +429,7 @@ export default function App() {
             className='modal-overlay'
             onClick={(e) => e.target === e.currentTarget && setIsAccountModalOpen(false)}
           >
-            <div className='modal panel'>
+            <div className='modal panel account-modal'>
               <div className='modal-header'>
                 <h2>계좌번호 설정</h2>
                 <button className='btn icon' onClick={() => setIsAccountModalOpen(false)}>
@@ -439,23 +439,7 @@ export default function App() {
               <p className='panel-hint'>
                 단체 문자 발송 시 {'{계좌번호}'} 변수에 들어갈 계좌번호를 입력하세요.
               </p>
-              <label className='input-label'>
-                계좌번호
-                <input
-                  className='input'
-                  value={accountNumber}
-                  onChange={(e) => {
-                    setAccountNumber(e.target.value);
-                    save('jeolim-cabbage-account-number', e.target.value);
-                  }}
-                  placeholder='예: 농협 352-1234-5678-90 홍길동'
-                />
-              </label>
-              <div className='form-actions'>
-                <button className='btn' onClick={() => setIsAccountModalOpen(false)}>
-                  닫기
-                </button>
-              </div>
+              <AccountManager />
             </div>
           </div>
         )}

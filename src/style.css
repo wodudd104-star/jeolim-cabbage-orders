@@ -829,6 +829,85 @@ h1 {
   font-weight: 600;
 }
 
+.account-panel .account-panel-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .account-panel .account-panel-header {
+    grid-template-columns: 1fr;
+  }
+}
+
+.account-modal {
+  max-width: 640px;
+  width: 90%;
+}
+
+.account-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.account-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f9fafb;
+  border-radius: var(--radius);
+  border: 1px solid #e5e7eb;
+}
+
+.account-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+}
+
+.account-bank {
+  font-weight: 800;
+  color: var(--primary-dark);
+}
+
+.account-number {
+  font-weight: 600;
+  color: #111827;
+}
+
+.account-holder {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-grid.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 640px) {
+  .form-grid.three {
+    grid-template-columns: 1fr;
+  }
+}
+
 .sms-textarea {
   resize: vertical;
   font-family: inherit;
