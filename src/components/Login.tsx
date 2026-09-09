@@ -382,11 +382,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
           </form>
         )}
 
-        <p className='login-hint'>
-          {mode === 'login'
-            ? '초기 아이디: admin / 비밀번호: 0000'
-            : '모든 정보는 서버에 안전하게 저장됩니다.'}
-        </p>
+        <p className='login-hint'>모든 정보는 서버에 안전하게 저장됩니다.</p>
       </div>
     </div>
   );
