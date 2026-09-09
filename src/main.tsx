@@ -709,9 +709,11 @@ export default function App() {
                               </option>
                             ))}
                           </select>
-                          <button className='btn icon' onClick={() => startEdit(order)} title='수정'>
-                            ✎
-                          </button>
+                          {isAdmin() && (
+                            <button className='btn icon' onClick={() => startEdit(order)} title='수정'>
+                              ✎
+                            </button>
+                          )}
                           {isAdmin() && (
                             <button className='btn icon danger' onClick={() => removeOrder(order.id)} title='삭제'>
                               ✕
