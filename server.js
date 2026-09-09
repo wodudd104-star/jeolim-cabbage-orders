@@ -5,7 +5,19 @@ import { config } from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
-import fs from 'fs/promises';
+import {
+  initDb,
+  ensureUsersTable,
+  listUsers,
+  findUserById,
+  findUsersByEmail,
+  createUser,
+  updateUser,
+  deleteUserById,
+  countAdmins,
+  hashPassword,
+  verifyPassword,
+} from './src/lib/db.js';
 
 config();
 
@@ -15,87 +27,41 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 
-const AUTH_FILE = path.join(__dirname, 'data', 'auth.json');
 const TARGET_ADMIN_ID = 'wodudd102';
+const DEFAULT_ADMIN_PASSWORD = '0000';
 
 async function runAdminMigration() {
-  const data = await loadAuthData();
-  let changed = false;
-
-  const target = data.users.find((u) => u.id === TARGET_ADMIN_ID);
-  const defaultAdmin = data.users.find((u) => u.id === 'admin');
-
-  if (target) {
-    if (target.role !== 'admin' || !target.active) {
-      target.role = 'admin';
-      target.active = true;
-      changed = true;
+  const user = await findUserById(TARGET_ADMIN_ID);
+  if (user) {
+    if (user.role !== 'admin' || !user.active) {
+      await updateUser(TARGET_ADMIN_ID, { role: 'admin', active: true });
     }
   }
 
-  if (defaultAdmin && data.users.some((u) => u.id !== 'admin' && u.role === 'admin')) {
-    data.users = data.users.filter((u) => u.id !== 'admin');
-    changed = true;
-  }
-
-  if (changed) await saveAuthData(data);
-}
-
-async function ensureDataDir() {
-  await fs.mkdir(path.dirname(AUTH_FILE), { recursive: true });
-}
-
-async function loadAuthData() {
-  try {
-    const raw = await fs.readFile(AUTH_FILE, 'utf-8');
-    const parsed = JSON.parse(raw);
-    // 구버전 단일 계정 형식 마이그레이션
-    if (Array.isArray(parsed.users)) return parsed;
-    if (parsed.id) {
-      return {
-        users: [
-          {
-            id: parsed.id,
-            email: parsed.email || '',
-            salt: parsed.salt,
-            hash: parsed.hash,
-            role: parsed.role || 'admin',
-            active: true,
-            createdAt: new Date().toISOString(),
-          },
-        ],
-      };
+  // 기존 admin 계정이 다른 관리자가 있으면 삭제
+  const defaultAdmin = await findUserById('admin');
+  if (defaultAdmin) {
+    const otherAdmins = (await listUsers()).filter(
+      (u) => u.role === 'admin' && u.id !== 'admin'
+    );
+    if (otherAdmins.length > 0) {
+      await deleteUserById('admin');
     }
-    return { users: [] };
-  } catch {
-    return { users: [] };
   }
 }
 
-async function saveAuthData(data) {
-  await ensureDataDir();
-  await fs.writeFile(AUTH_FILE, JSON.stringify(data, null, 2));
-}
-
-async function findUserById(id) {
-  const data = await loadAuthData();
-  return data.users.find((u) => u.id === id) || null;
-}
-
-async function findUsersByEmail(email) {
-  const data = await loadAuthData();
-  return data.users.filter((u) => u.email === email);
-}
-
-function hashPassword(password) {
-  const salt = crypto.randomUUID();
-  const hash = crypto.createHmac('sha256', salt).update(password).digest('hex');
-  return { salt, hash };
-}
-
-function verifyPassword(password, salt, hash) {
-  const computed = crypto.createHmac('sha256', salt).update(password).digest('hex');
-  return computed === hash;
+async function ensureDefaultAdmin() {
+  const admin = await findUserById('admin');
+  if (admin) return;
+  const { salt, hash } = hashPassword(DEFAULT_ADMIN_PASSWORD);
+  await createUser({
+    id: 'admin',
+    email: '',
+    salt,
+    hash,
+    role: 'admin',
+    active: true,
+  });
 }
 
 function getEmailTransporter() {
@@ -145,7 +111,7 @@ app.post('/api/login', async (req, res) => {
   }
 
   // 기본 관리자 계정은 항상 로그인 가능
-  if (id === 'admin' && password === '0000') {
+  if (id === 'admin' && password === DEFAULT_ADMIN_PASSWORD) {
     return res.json({ id: 'admin', role: 'admin', active: true, email: '' });
   }
 
@@ -168,39 +134,38 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ error: '아이디, 비밀번호, 이메일을 모두 입력해주세요.' });
   }
 
-  const data = await loadAuthData();
-  if (data.users.some((u) => u.id === id)) {
+  const existingById = await findUserById(id);
+  if (existingById) {
     return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
   }
-  if (data.users.some((u) => u.email === email)) {
+  const existingByEmail = await findUsersByEmail(email);
+  if (existingByEmail.length > 0) {
     return res.status(409).json({ error: '이미 사용 중인 이메일입니다.' });
   }
 
   const { salt, hash } = hashPassword(password);
-  const newUser = {
+  await createUser({
     id,
     email,
     salt,
     hash,
     role: 'user',
     active: false,
-    createdAt: new Date().toISOString(),
-  };
-  data.users.push(newUser);
-  await saveAuthData(data);
-  res.json({ success: true, role: newUser.role, active: newUser.active });
+  });
+  res.json({ success: true, role: 'user', active: false });
 });
 
 app.get('/api/users', async (_req, res) => {
-  const data = await loadAuthData();
-  const users = data.users.map((u) => ({
-    id: u.id,
-    email: u.email,
-    role: u.role,
-    active: u.active,
-    createdAt: u.createdAt,
-  }));
-  res.json(users);
+  const users = await listUsers();
+  res.json(
+    users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      role: u.role,
+      active: u.active,
+      createdAt: u.createdAt,
+    }))
+  );
 });
 
 app.post('/api/users', async (req, res) => {
@@ -208,85 +173,72 @@ app.post('/api/users', async (req, res) => {
   if (!id || !password || !email) {
     return res.status(400).json({ error: '아이디, 비밀번호, 이메일을 모두 입력해주세요.' });
   }
-  const data = await loadAuthData();
-  if (data.users.some((u) => u.id === id)) {
+  const existingById = await findUserById(id);
+  if (existingById) {
     return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
   }
-  if (data.users.some((u) => u.email === email)) {
+  const existingByEmail = await findUsersByEmail(email);
+  if (existingByEmail.length > 0) {
     return res.status(409).json({ error: '이미 사용 중인 이메일입니다.' });
   }
   const { salt, hash } = hashPassword(password);
-  data.users.push({
+  await createUser({
     id,
     email,
     salt,
     hash,
     role: role === 'admin' ? 'admin' : 'user',
     active: !!active,
-    createdAt: new Date().toISOString(),
   });
-  await saveAuthData(data);
   res.json({ success: true });
 });
 
 app.post('/api/users/:id/activate', async (req, res) => {
-  const data = await loadAuthData();
-  const user = data.users.find((u) => u.id === req.params.id);
+  const user = await findUserById(req.params.id);
   if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
-  user.active = true;
-  await saveAuthData(data);
+  await updateUser(req.params.id, { active: true });
   res.json({ success: true });
 });
 
 app.post('/api/users/:id/deactivate', async (req, res) => {
-  const data = await loadAuthData();
-  const user = data.users.find((u) => u.id === req.params.id);
+  const user = await findUserById(req.params.id);
   if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
   if (user.role === 'admin') {
     return res.status(403).json({ error: '관리자 계정은 비활성화할 수 없습니다.' });
   }
-  user.active = false;
-  await saveAuthData(data);
+  await updateUser(req.params.id, { active: false });
   res.json({ success: true });
 });
 
 app.post('/api/users/:id/promote', async (req, res) => {
-  const data = await loadAuthData();
-  const user = data.users.find((u) => u.id === req.params.id);
+  const user = await findUserById(req.params.id);
   if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
-  user.role = 'admin';
-  user.active = true;
-  await saveAuthData(data);
+  await updateUser(req.params.id, { role: 'admin', active: true });
   res.json({ success: true });
 });
 
 app.post('/api/users/:id/demote', async (req, res) => {
-  const data = await loadAuthData();
-  const user = data.users.find((u) => u.id === req.params.id);
+  const user = await findUserById(req.params.id);
   if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
   if (user.id === 'admin') {
     return res.status(403).json({ error: '기본 관리자 계정은 일반 사용자로 변경할 수 없습니다.' });
   }
-  user.role = 'user';
-  await saveAuthData(data);
+  await updateUser(req.params.id, { role: 'user' });
   res.json({ success: true });
 });
 
 app.delete('/api/users/:id', async (req, res) => {
-  const data = await loadAuthData();
-  const idx = data.users.findIndex((u) => u.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
-  // 자기 자신은 삭제 불가
-  // (요청자 정보를 알 수 없으므로 클라이언트에서 제어)
-  // 기본 admin 계정은 다른 관리자가 존재할 때만 삭제 가능
-  if (data.users[idx].id === 'admin') {
-    const otherAdmins = data.users.filter((u) => u.role === 'admin' && u.id !== 'admin');
+  const user = await findUserById(req.params.id);
+  if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+  if (user.id === 'admin') {
+    const otherAdmins = (await listUsers()).filter(
+      (u) => u.role === 'admin' && u.id !== 'admin'
+    );
     if (otherAdmins.length === 0) {
       return res.status(403).json({ error: '다른 관리자가 없어 기본 관리자를 삭제할 수 없습니다.' });
     }
   }
-  data.users.splice(idx, 1);
-  await saveAuthData(data);
+  await deleteUserById(req.params.id);
   res.json({ success: true });
 });
 
@@ -337,43 +289,57 @@ app.post('/api/reset-password', async (req, res) => {
   if (!verifyCode(email, code)) {
     return res.status(400).json({ error: '인증번호가 올바르지 않거나 만료되었습니다.' });
   }
-  const data = await loadAuthData();
   const { salt, hash } = hashPassword(newPassword);
-  data.users = data.users.map((u) => {
-    if (u.email !== email) return u;
-    return { ...u, salt, hash };
-  });
-  await saveAuthData(data);
+  for (const user of users) {
+    await updateUser(user.id, { salt, hash });
+  }
   res.json({ success: true });
 });
 
 app.post('/api/update-auth', async (req, res) => {
   const { currentId, currentPassword, newId, newPassword, email } = req.body;
-  const data = await loadAuthData();
-  const user = data.users.find((u) => u.id === currentId);
+  const user = await findUserById(currentId);
   if (!user) {
     return res.status(400).json({ error: '서버에 등록된 계정이 없습니다.' });
   }
   if (!verifyPassword(currentPassword, user.salt, user.hash)) {
     return res.status(403).json({ error: '현재 아이디 또는 비밀번호가 틀렸습니다.' });
   }
-  if (newId && newId !== currentId && data.users.some((u) => u.id === newId)) {
-    return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
+  if (newId && newId !== currentId) {
+    const conflict = await findUserById(newId);
+    if (conflict) return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
   }
-  if (email && email !== user.email && data.users.some((u) => u.email === email)) {
-    return res.status(409).json({ error: '이미 사용 중인 이메일입니다.' });
+  if (email && email !== user.email) {
+    const conflict = await findUsersByEmail(email);
+    if (conflict.length > 0) return res.status(409).json({ error: '이미 사용 중인 이메일입니다.' });
   }
 
-  const idx = data.users.findIndex((u) => u.id === currentId);
-  if (newId) data.users[idx].id = newId;
-  if (email) data.users[idx].email = email;
+  const patch = {};
+  if (newId) patch.id = newId;
+  if (email) patch.email = email;
   if (newPassword) {
     const { salt, hash } = hashPassword(newPassword);
-    data.users[idx].salt = salt;
-    data.users[idx].hash = hash;
+    patch.salt = salt;
+    patch.hash = hash;
   }
-  await saveAuthData(data);
-  res.json({ success: true, id: data.users[idx].id });
+
+  // id 변경 시 삭제 후 재생성
+  if (newId && newId !== currentId) {
+    const { salt, hash } = patch.hash ? { salt: patch.salt, hash: patch.hash } : { salt: user.salt, hash: user.hash };
+    await createUser({
+      id: newId,
+      email: patch.email || user.email,
+      salt,
+      hash,
+      role: user.role,
+      active: user.active,
+    });
+    await deleteUserById(currentId);
+    return res.json({ success: true, id: newId });
+  }
+
+  await updateUser(currentId, patch);
+  res.json({ success: true, id: currentId });
 });
 
 function getAuthHeader(apiKey, apiSecret) {
@@ -442,6 +408,13 @@ app.get('*', (_req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-runAdminMigration().then(() => {
+(async () => {
+  try {
+    await ensureUsersTable();
+    await ensureDefaultAdmin();
+    await runAdminMigration();
+  } catch (err) {
+    console.error('Startup error:', err);
+  }
   app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
-});
+})();
