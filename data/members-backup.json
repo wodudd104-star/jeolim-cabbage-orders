@@ -6,7 +6,7 @@
       "salt": "2f1cf168-dd10-40ff-aba4-67306c7dd3cd",
       "hash": "af7f4a3659fb2358078f2cc9398da80eda128fd17f7e743c58c84a916542904f",
       "role": "user",
-      "active": false,
+      "active": true,
       "createdAt": "2026-09-09T13:31:57.826Z"
     }
   ]
