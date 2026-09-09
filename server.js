@@ -478,7 +478,7 @@ const PORT = process.env.PORT || 3000;
 (async () => {
   try {
     const dbUrlSet = !!process.env.DATABASE_URL;
-    console.log(`DATABASE_URL ${dbUrlSet ? 'is set' : 'is NOT set'} (storage: ${dbUrlSet ? 'PostgreSQL' : 'local JSON'})`);
+    console.log(`[STARTUP] DATABASE_URL ${dbUrlSet ? 'is set' : 'is NOT set'} (storage: ${dbUrlSet ? 'PostgreSQL' : 'local JSON'})`);
     await ensureUsersTable();
     await migrateJsonToDb();
     await ensureDefaultAdmin();
