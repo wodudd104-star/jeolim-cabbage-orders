@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as XLSX from 'xlsx';
 import './style.css';
@@ -14,6 +14,12 @@ const STATUS_LIST: OrderStatus[] = ['접수', '준비중', '완료', '취소'];
 const PICKUP_LIST: PickupType[] = ['매장방문', '배송'];
 const ORDERS_KEY = 'jeolim-cabbage-orders-v3';
 const PRODUCTS_KEY = 'jeolim-cabbage-products-v1';
+
+declare global {
+  interface Window {
+    daum: any;
+  }
+}
 
 const defaultProducts: Product[] = [
   { id: 'p1', name: '포기김치용', unit: '포기', price: 12000 },
@@ -77,6 +83,8 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSmsOpen, setIsSmsOpen] = useState(false);
   const [printOrder, setPrintOrder] = useState<Order | null>(null);
+  const [isPostcodeOpen, setIsPostcodeOpen] = useState(false);
+  const postcodeWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setOrders(load(ORDERS_KEY, []));
@@ -260,6 +268,41 @@ export default function App() {
     logout();
     setLoggedIn(false);
     setPage('orders');
+  }
+
+  function loadPostcodeScript(): Promise<typeof window.daum> {
+    return new Promise((resolve, reject) => {
+      if (window.daum && window.daum.Postcode) {
+        resolve(window.daum);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+      script.async = true;
+      script.onload = () => resolve(window.daum);
+      script.onerror = () => reject(new Error('주소 검색 스크립트를 불러오지 못했습니다.'));
+      document.head.appendChild(script);
+    });
+  }
+
+  async function openPostcode() {
+    try {
+      const daum = await loadPostcodeScript();
+      setIsPostcodeOpen(true);
+      setTimeout(() => {
+        if (!postcodeWrapRef.current) return;
+        new daum.Postcode({
+          width: '100%',
+          height: '100%',
+          oncomplete: (data: any) => {
+            setForm((prev) => ({ ...prev, address: data.address }));
+            setIsPostcodeOpen(false);
+          },
+        }).embed(postcodeWrapRef.current);
+      }, 0);
+    } catch (err) {
+      alert('주소 검색을 불러오는 중 오류가 발생했습니다.');
+    }
   }
 
   function getOrderPublicUrl(orderId: string) {
@@ -561,12 +604,17 @@ export default function App() {
                     {form.pickup === '배송' && (
                       <label className='full'>
                         배송 주소
-                        <input
-                          className='input'
-                          value={form.address}
-                          onChange={(e) => setForm({ ...form, address: e.target.value })}
-                          placeholder='주소를 입력하세요'
-                        />
+                        <div className='address-row'>
+                          <input
+                            className='input'
+                            value={form.address}
+                            onChange={(e) => setForm({ ...form, address: e.target.value })}
+                            placeholder='주소를 입력하세요'
+                          />
+                          <button type='button' className='btn' onClick={openPostcode}>
+                            🔍 주소 검색
+                          </button>
+                        </div>
                       </label>
                     )}
                     <label className='full'>
@@ -589,6 +637,23 @@ export default function App() {
                   </div>
                 </form>
               </section>
+            )}
+
+            {isPostcodeOpen && (
+              <div
+                className='modal-overlay postcode-overlay'
+                onClick={(e) => e.target === e.currentTarget && setIsPostcodeOpen(false)}
+              >
+                <div className='modal panel postcode-modal'>
+                  <div className='modal-header'>
+                    <h2>주소 검색</h2>
+                    <button className='btn icon' onClick={() => setIsPostcodeOpen(false)}>
+                      ✕
+                    </button>
+                  </div>
+                  <div ref={postcodeWrapRef} className='postcode-wrap'></div>
+                </div>
+              </div>
             )}
 
             {isSettingsOpen && isAdmin() && (
