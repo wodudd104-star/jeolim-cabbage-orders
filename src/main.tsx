@@ -272,12 +272,14 @@ export default function App() {
               >
                 주문
               </button>
-              <button
-                className={`btn ${page === 'customers' ? 'active' : ''}`}
-                onClick={() => setPage('customers')}
-              >
-                고객
-              </button>
+              {isAdmin() && (
+                <button
+                  className={`btn ${page === 'customers' ? 'active' : ''}`}
+                  onClick={() => setPage('customers')}
+                >
+                  고객
+                </button>
+              )}
               {isAdmin() && (
                 <button
                   className={`btn ${page === 'admin' ? 'active' : ''}`}
@@ -287,7 +289,7 @@ export default function App() {
                 </button>
               )}
             </nav>
-            {page === 'orders' && (
+            {page === 'orders' && isAdmin() && (
               <>
                 <button className='btn' onClick={() => setIsSmsOpen(true)}>
                   ✉ 단체 문자
@@ -300,15 +302,20 @@ export default function App() {
                 </button>
               </>
             )}
+            {page === 'orders' && !isAdmin() && (
+              <button className='btn btn-primary' onClick={openNewForm}>
+                + 새 주문
+              </button>
+            )}
             <button className='btn' onClick={handleLogout}>
               로그아웃
             </button>
           </div>
         </header>
 
-        {page === 'customers' ? (
+        {page === 'customers' && isAdmin() ? (
           <Customers orders={orders} />
-        ) : page === 'admin' ? (
+        ) : page === 'admin' && isAdmin() ? (
           <Admin />
         ) : (
           <>
@@ -516,7 +523,7 @@ export default function App() {
               </section>
             )}
 
-            {isSettingsOpen && (
+            {isSettingsOpen && isAdmin() && (
               <ProductSettingsModal
                 products={products}
                 onChange={setProducts}
@@ -524,7 +531,7 @@ export default function App() {
               />
             )}
 
-            {isSmsOpen && <SmsModal orders={orders} onClose={() => setIsSmsOpen(false)} />}
+            {isSmsOpen && isAdmin() && <SmsModal orders={orders} onClose={() => setIsSmsOpen(false)} />}
 
             <section className='order-list'>
               {filtered.length === 0 ? (

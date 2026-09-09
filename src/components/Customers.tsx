@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Customer, Order } from '../types';
 import { load, save } from '../lib/storage';
+import { isAdmin } from './Login';
 
 declare global {
   interface Window {
@@ -48,6 +49,8 @@ export default function Customers({ orders }: { orders: Order[] }) {
     memo: '',
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const admin = isAdmin();
 
   const filtered = useMemo(() => {
     const term = search.trim();
@@ -238,22 +241,26 @@ export default function Customers({ orders }: { orders: Order[] }) {
           <h1>고객 관리</h1>
         </div>
         <div className='header-actions'>
-          <button className='btn' onClick={exportCustomers}>
-            📤 엑셀 저장
-          </button>
-          <button className='btn' onClick={() => fileInputRef.current?.click()}>
-            📥 엑셀 불러오기
-          </button>
-          <input
-            ref={fileInputRef}
-            type='file'
-            accept='.xlsx,.xls,.csv'
-            style={{ display: 'none' }}
-            onChange={handleFileSelect}
-          />
-          <button className='btn btn-primary' onClick={openNewForm}>
-            + 새 고객
-          </button>
+          {admin && (
+            <>
+              <button className='btn' onClick={exportCustomers}>
+                📤 엑셀 저장
+              </button>
+              <button className='btn' onClick={() => fileInputRef.current?.click()}>
+                📥 엑셀 불러오기
+              </button>
+              <input
+                ref={fileInputRef}
+                type='file'
+                accept='.xlsx,.xls,.csv'
+                style={{ display: 'none' }}
+                onChange={handleFileSelect}
+              />
+              <button className='btn btn-primary' onClick={openNewForm}>
+                + 새 고객
+              </button>
+            </>
+          )}
         </div>
       </header>
 
@@ -267,7 +274,7 @@ export default function Customers({ orders }: { orders: Order[] }) {
         />
       </section>
 
-      {isFormOpen && (
+      {admin && isFormOpen && (
         <section className='panel form-panel'>
           <h2>{editingId ? '고객 수정' : '새 고객 등록'}</h2>
           <form onSubmit={handleSubmit}>
@@ -340,7 +347,7 @@ export default function Customers({ orders }: { orders: Order[] }) {
         </section>
       )}
 
-      {isPostcodeOpen && (
+      {admin && isPostcodeOpen && (
         <div
           className='modal-overlay postcode-overlay'
           onClick={(e) => e.target === e.currentTarget && setIsPostcodeOpen(false)}
@@ -376,22 +383,24 @@ export default function Customers({ orders }: { orders: Order[] }) {
                       <span className='tag highlight'>{orderCount}건 주문</span>
                     )}
                   </div>
-                  <div className='customer-actions'>
-                    <button
-                      className='btn icon'
-                      onClick={() => startEdit(customer)}
-                      title='수정'
-                    >
-                      ✎
-                    </button>
-                    <button
-                      className='btn icon danger'
-                      onClick={() => removeCustomer(customer.id)}
-                      title='삭제'
-                    >
-                      ✕
-                    </button>
-                  </div>
+                  {admin && (
+                    <div className='customer-actions'>
+                      <button
+                        className='btn icon'
+                        onClick={() => startEdit(customer)}
+                        title='수정'
+                      >
+                        ✎
+                      </button>
+                      <button
+                        className='btn icon danger'
+                        onClick={() => removeCustomer(customer.id)}
+                        title='삭제'
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {customer.address && (
                   <p className='customer-address'>{customer.address}</p>
