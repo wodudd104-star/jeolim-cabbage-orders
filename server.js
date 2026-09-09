@@ -5,6 +5,7 @@ import { config } from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
+import fs from 'fs/promises';
 import {
   initDb,
   ensureUsersTable,
@@ -29,6 +30,52 @@ app.use(express.json());
 
 const TARGET_ADMIN_ID = 'wodudd102';
 const DEFAULT_ADMIN_PASSWORD = '0000';
+const AUTH_FILE = path.join(__dirname, 'data', 'auth.json');
+
+async function loadLegacyJsonUsers() {
+  try {
+    const raw = await fs.readFile(AUTH_FILE, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed.users)) return parsed.users;
+    if (parsed.id) return [parsed];
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+async function migrateJsonToDb() {
+  const db = initDb();
+  if (!db) return;
+  const legacy = await loadLegacyJsonUsers();
+  if (legacy.length === 0) return;
+
+  const existing = await listUsers();
+  const existingIds = new Set(existing.map((u) => u.id));
+  let migrated = 0;
+
+  for (const u of legacy) {
+    if (existingIds.has(u.id)) continue;
+    if (!u.id || !u.salt || !u.hash) continue;
+    try {
+      await createUser({
+        id: u.id,
+        email: u.email || '',
+        salt: u.salt,
+        hash: u.hash,
+        role: u.role === 'admin' ? 'admin' : 'user',
+        active: u.active !== false,
+      });
+      migrated++;
+    } catch (err) {
+      console.error(`Migration failed for ${u.id}:`, err.message);
+    }
+  }
+
+  if (migrated > 0) {
+    console.log(`Migrated ${migrated} users from auth.json to database.`);
+  }
+}
 
 async function runAdminMigration() {
   const user = await findUserById(TARGET_ADMIN_ID);
@@ -410,9 +457,15 @@ const PORT = process.env.PORT || 3000;
 
 (async () => {
   try {
+    const dbUrlSet = !!process.env.DATABASE_URL;
+    console.log(`DATABASE_URL ${dbUrlSet ? 'is set' : 'is NOT set'} (storage: ${dbUrlSet ? 'PostgreSQL' : 'local JSON'})`);
     await ensureUsersTable();
+    await migrateJsonToDb();
     await ensureDefaultAdmin();
     await runAdminMigration();
+    const users = await listUsers();
+    console.log(`Total users in storage: ${users.length}`);
+    console.log(`Users: ${users.map((u) => `${u.id}(${u.role})`).join(', ')}`);
   } catch (err) {
     console.error('Startup error:', err);
   }
