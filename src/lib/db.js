@@ -56,11 +56,31 @@ export function verifyPassword(password, salt, hash) {
 
 async function loadJsonUsers() {
   let parsed = null;
-  try {
-    const raw = await fs.readFile(AUTH_FILE, 'utf-8');
-    parsed = JSON.parse(raw);
-  } catch {
-    parsed = null;
+
+  // GitHub에서 최신 데이터를 먼저 가져옵니다 (Render 재시작 대응)
+  if (GITHUB_TOKEN) {
+    const repo = await getGitHubRepo();
+    if (repo) {
+      try {
+        const data = await fetchFileFromGitHub(repo, 'data/auth.json');
+        if (data) {
+          parsed = data;
+          console.log('[DB] Loaded users from GitHub data/auth.json');
+          await saveJsonUsersLocal(parsed);
+        }
+      } catch (err) {
+        console.error('[DB] Failed to fetch auth.json from GitHub:', err.message);
+      }
+    }
+  }
+
+  if (!parsed) {
+    try {
+      const raw = await fs.readFile(AUTH_FILE, 'utf-8');
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
   }
 
   if (!parsed) {
@@ -70,22 +90,6 @@ async function loadJsonUsers() {
       console.log('[DB] Restored users from members-backup.json');
     } catch {
       parsed = null;
-    }
-  }
-
-  if (!parsed && GITHUB_TOKEN) {
-    const remote = await fetchRepoFromGitHub();
-    if (remote) {
-      try {
-        const data = await fetchFileFromGitHub(remote, 'data/auth.json');
-        if (data) {
-          parsed = data;
-          console.log('[DB] Restored users from GitHub data/auth.json');
-          await saveJsonUsersLocal(parsed);
-        }
-      } catch (err) {
-        console.error('[DB] Failed to fetch auth.json from GitHub:', err.message);
-      }
     }
   }
 
