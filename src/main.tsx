@@ -294,7 +294,7 @@ export default function App() {
     <main className='app-shell'>
       <div className='container'>
         <header className='app-header'>
-          <button className='brand' onClick={() => setPage('orders')} title='초기 화면으로 이동'>
+          <button className='brand' onClick={() => setPage('dashboard')} title='대시보드로 이동'>
             <span className='brand-icon'>
               <svg viewBox='0 0 24 24' width='32' height='32' fill='none' xmlns='http://www.w3.org/2000/svg'>
                 <circle cx='12' cy='12' r='10' fill='#16a34a'/>
