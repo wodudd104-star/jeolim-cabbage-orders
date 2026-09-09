@@ -398,8 +398,27 @@ h1 {
   gap: 10px;
 }
 
-.rank-item,
 .simple-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border-radius: var(--radius);
+}
+
+.list-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.list-content {
+  color: #111827;
+  font-weight: 500;
+}
+
+.rank-item {
   display: flex;
   align-items: center;
   gap: 10px;

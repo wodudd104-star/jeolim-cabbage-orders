@@ -161,7 +161,14 @@ export default function Dashboard({ orders, products }: DashboardProps) {
             <ul className='simple-list'>
               {stats.upcomingPickups.map((o) => (
                 <li key={o.id}>
-                  <strong>{formatDate(o.pickupDate)}</strong> {o.name} · {o.cabbageType} {o.quantity}{o.unit}
+                  <div className='list-dates'>
+                    <span className='tag highlight'>수령 {formatDate(o.pickupDate)}</span>
+                    <span className='tag'>접수 {formatDate(o.createdAt)}</span>
+                    {o.preparationDate && <span className='tag'>준비 {formatDate(o.preparationDate)}</span>}
+                  </div>
+                  <div className='list-content'>
+                    {o.name} · {o.cabbageType} {o.quantity}{o.unit}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -176,7 +183,15 @@ export default function Dashboard({ orders, products }: DashboardProps) {
             <ul className='simple-list'>
               {stats.recentOrders.map((o) => (
                 <li key={o.id}>
-                  <strong>{formatDate(o.createdAt)}</strong> {o.name} · {o.cabbageType} {o.quantity}{o.unit} · {formatCurrency(o.totalPrice)} · {o.status}
+                  <div className='list-dates'>
+                    <span className='tag'>접수 {formatDate(o.createdAt)}</span>
+                    {o.preparationDate && <span className='tag'>준비 {formatDate(o.preparationDate)}</span>}
+                    {o.pickupDate && <span className='tag'>수령 {formatDate(o.pickupDate)}</span>}
+                    <span className={`tag status-${o.status}`}>{o.status}</span>
+                  </div>
+                  <div className='list-content'>
+                    {o.name} · {o.cabbageType} {o.quantity}{o.unit} · {formatCurrency(o.totalPrice)}
+                  </div>
                 </li>
               ))}
             </ul>
