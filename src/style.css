@@ -1241,6 +1241,115 @@ h1 {
   gap: 8px;
 }
 
+.public-order {
+  max-width: 560px;
+  margin: 40px auto;
+}
 
+.public-order-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
 
+.public-order-header h2 {
+  margin: 0;
+}
 
+.public-order-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.public-order-info .info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.public-order-info .info-row span:first-child {
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.public-order-info .info-row.strong {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.public-order-thanks {
+  text-align: center;
+  color: #6b7280;
+  margin: 0;
+}
+
+.progress-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.progress-bar::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 16%;
+  right: 16%;
+  height: 4px;
+  background: #e5e7eb;
+  z-index: 0;
+}
+
+.progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  z-index: 1;
+  flex: 1;
+}
+
+.step-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  border: 2px solid #e5e7eb;
+}
+
+.progress-step.active .step-dot {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.progress-step.cancel .step-dot {
+  background: #ef4444;
+  border-color: #ef4444;
+}
+
+.step-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.progress-step.active .step-label {
+  color: var(--primary-dark);
+}
+
+.progress-step.cancel .step-label {
+  color: #ef4444;
+}
+
+.tag.status-접수 { background: #dbeafe; color: #1e40af; }
+.tag.status-준비중 { background: #fef3c7; color: #92400e; }
+.tag.status-완료 { background: #d1fae5; color: #065f46; }
+.tag.status-취소 { background: #f3f4f6; color: #374151; }

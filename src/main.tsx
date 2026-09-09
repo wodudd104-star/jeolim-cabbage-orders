@@ -262,6 +262,30 @@ export default function App() {
     setPage('orders');
   }
 
+  function getOrderPublicUrl(orderId: string) {
+    const url = new URL(window.location.href);
+    url.search = `?order=${orderId}`;
+    return url.toString();
+  }
+
+  async function copyOrderUrl(order: Order) {
+    const url = getOrderPublicUrl(order.id);
+    try {
+      await navigator.clipboard.writeText(url);
+      alert('주문 조회 링크가 복사되었습니다.');
+    } catch {
+      prompt('주문 조회 링크를 복사해주세요.', url);
+    }
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const publicOrderId = params.get('order');
+  const publicOrder = publicOrderId ? orders.find((o) => o.id === publicOrderId) : undefined;
+
+  if (publicOrderId) {
+    return <PublicOrderView order={publicOrder} />;
+  }
+
   if (!loggedIn) {
     return <Login onLogin={() => setLoggedIn(true)} />;
   }
@@ -606,6 +630,9 @@ export default function App() {
                           <button className='btn icon' onClick={() => handlePrint(order)} title='영수증 인쇄'>
                             🖨
                           </button>
+                          <button className='btn icon' onClick={() => copyOrderUrl(order)} title='주문 조회 링크 복사'>
+                            🔗
+                          </button>
                           <select
                             className='select status-select'
                             value={order.status}
@@ -769,6 +796,123 @@ function Receipt({ order }: { order: Order }) {
         <span>{getPaymentStatus(order)}</span>
       </div>
       <p className='receipt-thanks'>이용해주셔서 감사합니다.</p>
+    </div>
+  );
+}
+
+function PublicOrderView({ order }: { order: Order | undefined }) {
+  if (!order) {
+    return (
+      <div className='app-shell'>
+        <div className='container'>
+          <div className='panel public-order'>
+            <h2>주문 조회</h2>
+            <p className='empty'>해당 주문을 찾을 수 없습니다.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const balance = order.totalPrice - order.depositAmount;
+  const steps = ['접수', '준비중', '완료'];
+  const stepIndex = steps.indexOf(order.status === '취소' ? '접수' : order.status);
+
+  return (
+    <div className='app-shell'>
+      <div className='container'>
+        <div className='panel public-order'>
+          <header className='public-order-header'>
+            <h2>주문 조회</h2>
+            <span className={`tag status-${order.status}`}>{order.status}</span>
+          </header>
+
+          <div className='progress-bar'>
+            {steps.map((s, idx) => (
+              <div
+                key={s}
+                className={`progress-step ${idx <= stepIndex ? 'active' : ''} ${order.status === '취소' ? 'cancel' : ''}`}
+              >
+                <span className='step-dot'></span>
+                <span className='step-label'>{s}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className='public-order-info'>
+            <div className='info-row'>
+              <span>주문일</span>
+              <span>{formatDate(order.createdAt)}</span>
+            </div>
+            <div className='info-row'>
+              <span>고객명</span>
+              <span>{order.name}</span>
+            </div>
+            <div className='info-row'>
+              <span>연락처</span>
+              <span>{order.phone || '-'}</span>
+            </div>
+            <div className='info-row'>
+              <span>품목</span>
+              <span>{order.cabbageType}</span>
+            </div>
+            <div className='info-row'>
+              <span>수량</span>
+              <span>{order.quantity} {order.unit}</span>
+            </div>
+            <div className='info-row'>
+              <span>단가</span>
+              <span>{formatCurrency(order.pricePerUnit)}</span>
+            </div>
+            <div className='info-row strong'>
+              <span>총액</span>
+              <span>{formatCurrency(order.totalPrice)}</span>
+            </div>
+            <div className='info-row'>
+              <span>입금액</span>
+              <span>{formatCurrency(order.depositAmount)}</span>
+            </div>
+            <div className='info-row strong'>
+              <span>잔액</span>
+              <span>{formatCurrency(balance)}</span>
+            </div>
+            <div className='info-row'>
+              <span>수령방식</span>
+              <span>{order.pickup}</span>
+            </div>
+            {order.preparationDate && (
+              <div className='info-row'>
+                <span>준비일</span>
+                <span>{formatDate(order.preparationDate)}</span>
+              </div>
+            )}
+            {order.pickupDate && (
+              <div className='info-row'>
+                <span>수령희망일</span>
+                <span>{formatDate(order.pickupDate)}</span>
+              </div>
+            )}
+            {order.address && (
+              <div className='info-row'>
+                <span>주소</span>
+                <span>{order.address}</span>
+              </div>
+            )}
+            {order.memo && (
+              <div className='info-row'>
+                <span>메모</span>
+                <span>{order.memo}</span>
+              </div>
+            )}
+            <div className='info-row'>
+              <span>입금상태</span>
+              <span>{getPaymentStatus(order)}</span>
+            </div>
+          </div>
+
+          <p className='public-order-thanks'>이용해주셔서 감사합니다.</p>
+        </div>
+      </div>
     </div>
   );
 }
