@@ -779,8 +779,8 @@ function personalizeMessage(template: string, order: Order) {
     .split('{이름}').join(`${order.name} 고객님`)
     .split('{품목}').join(order.cabbageType)
     .split('{수량}').join(`${order.quantity}${order.unit}`)
-    .split('{금액}').join(`미수금(잔액) ${formatCurrency(balance)}`)
-    .split('{잔액}').join(formatCurrency(balance))
+    .split('{금액}').join(`미수금 ${formatCurrency(balance)}`)
+    .split('{잔액}').join(`잔액 ${formatCurrency(balance)}`)
     .split('{입금액}').join(formatCurrency(order.depositAmount))
     .split('{수령일}').join(formatDate(order.pickupDate))
     .split('{주문URL}').join(getOrderPublicUrl(order.id));
