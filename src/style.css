@@ -822,6 +822,76 @@ h1 {
   color: #9ca3af;
 }
 
+.login-tabs {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.login-tabs .btn {
+  flex: 1;
+  background: #fff;
+}
+
+.login-tabs .btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.login-success {
+  color: var(--primary-dark);
+  font-size: 0.85rem;
+  margin: 0;
+  padding: 8px;
+  border-radius: var(--radius);
+  background: #ecfdf5;
+}
+
+.login-warning {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin: 0;
+  padding: 8px;
+  border-radius: var(--radius);
+  background: #fef2f2;
+}
+
+.find-type {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+.find-type label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.find-question {
+  text-align: left;
+  padding: 10px;
+  border-radius: var(--radius);
+  background: #f9fafb;
+  font-size: 0.9rem;
+}
+
+.find-question strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #374151;
+}
+
+.find-question p {
+  margin: 0;
+  color: #111827;
+  font-weight: 600;
+}
+
 .customer-shell {
   display: flex;
   flex-direction: column;
