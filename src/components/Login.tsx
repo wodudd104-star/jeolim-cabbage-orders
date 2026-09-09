@@ -1,5 +1,11 @@
 import React, { useState } from 'react';
 import { load, save } from '../lib/storage';
+import {
+  findIdByEmail,
+  registerAccount,
+  resetPassword,
+  sendResetCode,
+} from '../lib/api';
 
 const AUTH_SESSION_KEY = 'jeolim-auth-session';
 const AUTH_KEY = 'jeolim-cabbage-auth-v1';
@@ -7,8 +13,7 @@ const AUTH_KEY = 'jeolim-cabbage-auth-v1';
 export type AuthCredentials = {
   id: string;
   password: string;
-  question: string;
-  answer: string;
+  email: string;
 };
 
 export function isLoggedIn() {
@@ -20,7 +25,7 @@ export function logout() {
 }
 
 export function getStoredCredentials(): AuthCredentials {
-  return load(AUTH_KEY, { id: 'admin', password: '0000', question: '', answer: '' });
+  return load(AUTH_KEY, { id: 'admin', password: '0000', email: '' });
 }
 
 export function setStoredCredentials(auth: AuthCredentials) {
@@ -40,15 +45,16 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
   const [signupId, setSignupId] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [signupConfirm, setSignupConfirm] = useState('');
-  const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
 
   // 찾기
   const [findType, setFindType] = useState<'id' | 'password'>('id');
-  const [findId, setFindId] = useState('');
-  const [findAnswer, setFindAnswer] = useState('');
+  const [findEmail, setFindEmail] = useState('');
+  const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -61,6 +67,10 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
   function switchMode(next: LoginMode) {
     setMode(next);
     resetMessages();
+    setCodeSent(false);
+    setCode('');
+    setNewPassword('');
+    setNewPasswordConfirm('');
   }
 
   function handleLogin(e: React.FormEvent) {
@@ -75,7 +85,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
     }
   }
 
-  function handleSignup(e: React.FormEvent) {
+  async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
     resetMessages();
     if (!signupId.trim()) {
@@ -90,45 +100,58 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
       setError('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
       return;
     }
-    if (!question.trim() || !answer.trim()) {
-      setError('아이디/비밀번호 찾기용 질문과 답변을 입력해주세요.');
+    if (!signupEmail.trim() || !signupEmail.includes('@')) {
+      setError('올바른 이메일을 입력해주세요.');
       return;
     }
-    setStoredCredentials({
-      id: signupId,
-      password: signupPassword,
-      question,
-      answer,
-    });
-    setSuccess('회원가입이 완료되었습니다. 로그인해주세요.');
-    setMode('login');
-    setId(signupId);
-    setSignupId('');
-    setSignupPassword('');
-    setSignupConfirm('');
-    setQuestion('');
-    setAnswer('');
+    try {
+      await registerAccount(signupId, signupPassword, signupEmail);
+      setStoredCredentials({
+        id: signupId,
+        password: signupPassword,
+        email: signupEmail,
+      });
+      setSuccess('회원가입이 완료되었습니다. 로그인해주세요.');
+      setMode('login');
+      setId(signupId);
+      setSignupId('');
+      setSignupPassword('');
+      setSignupConfirm('');
+      setSignupEmail('');
+    } catch (err: any) {
+      setError(err.message || '회원가입 중 오류가 발생했습니다.');
+    }
   }
 
-  function handleFind(e: React.FormEvent) {
+  async function handleSendCode(e?: React.FormEvent) {
+    e?.preventDefault();
+    resetMessages();
+    if (!findEmail.trim() || !findEmail.includes('@')) {
+      setError('올바른 이메일을 입력해주세요.');
+      return;
+    }
+    setSending(true);
+    try {
+      if (findType === 'id') {
+        await findIdByEmail(findEmail);
+        setSuccess('아이디를 이메일로 발송했습니다. 메일함을 확인해주세요.');
+      } else {
+        await sendResetCode(findEmail);
+        setCodeSent(true);
+        setSuccess('인증번호를 이메일로 발송했습니다. 메일함을 확인해주세요.');
+      }
+    } catch (err: any) {
+      setError(err.message || '이메일 발송 중 오류가 발생했습니다.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleResetPassword(e: React.FormEvent) {
     e.preventDefault();
     resetMessages();
-    const auth = getStoredCredentials();
-    if (!auth.question || !auth.answer) {
-      setError('등록된 본인확인 질문이 없습니다. 관리자에게 문의하세요.');
-      return;
-    }
-    if (findAnswer.trim().toLowerCase() !== auth.answer.trim().toLowerCase()) {
-      setError('질문의 답변이 일치하지 않습니다.');
-      return;
-    }
-    if (findType === 'id') {
-      setSuccess(`아이디는 "${auth.id}" 입니다.`);
-      return;
-    }
-    // 비밀번호 재설정
-    if (findId.trim() !== auth.id) {
-      setError('아이디가 일치하지 않습니다.');
+    if (!code.trim()) {
+      setError('인증번호를 입력해주세요.');
       return;
     }
     if (!newPassword.trim()) {
@@ -139,23 +162,40 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
       setError('새 비밀번호와 확인이 일치하지 않습니다.');
       return;
     }
-    setStoredCredentials({ ...auth, password: newPassword });
-    setSuccess('비밀번호가 재설정되었습니다. 로그인해주세요.');
-    setMode('login');
-    setFindId('');
-    setFindAnswer('');
-    setNewPassword('');
-    setNewPasswordConfirm('');
+    try {
+      await resetPassword(findEmail, code, newPassword);
+      setStoredCredentials({
+        id: getStoredCredentials().id,
+        password: newPassword,
+        email: findEmail,
+      });
+      setSuccess('비밀번호가 재설정되었습니다. 로그인해주세요.');
+      setMode('login');
+      setFindEmail('');
+      setCode('');
+      setNewPassword('');
+      setNewPasswordConfirm('');
+      setCodeSent(false);
+    } catch (err: any) {
+      setError(err.message || '비밀번호 재설정 중 오류가 발생했습니다.');
+    }
   }
 
   const auth = getStoredCredentials();
-  const hasAccount = auth.id !== 'admin' || auth.password !== '0000' || auth.question;
+  const hasAccount = auth.id !== 'admin' || auth.password !== '0000' || auth.email;
 
   return (
     <div className='login-overlay'>
       <div className='login-box panel'>
         <h1>절임배추 관리</h1>
-        <p>관리자 {mode === 'login' ? '로그인' : mode === 'signup' ? '회원가입' : '아이디·비밀번호 찾기'}</p>
+        <p>
+          관리자{' '}
+          {mode === 'login'
+            ? '로그인'
+            : mode === 'signup'
+            ? '회원가입'
+            : '아이디·비밀번호 찾기'}
+        </p>
 
         <div className='login-tabs'>
           <button
@@ -207,7 +247,8 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
           <form onSubmit={handleSignup}>
             {hasAccount && (
               <p className='login-warning'>
-                ⚠ 이미 등록된 계정이 있습니다. 새로 가입하면 기존 계정이 교체됩니다.
+                ⚠ 이미 등록된 계정이 있습니다. 새로 가입하면 기존 계정이
+                교첵됩니다.
               </p>
             )}
             <input
@@ -233,20 +274,14 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
               onChange={(e) => setSignupConfirm(e.target.value)}
             />
             <input
-              type='text'
+              type='email'
               className='input'
-              placeholder='본인확인 질문 (예: 출생지는?)'
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-            />
-            <input
-              type='text'
-              className='input'
-              placeholder='본인확인 답변'
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
+              placeholder='이메일 (아이디/비밀번호 찾기용)'
+              value={signupEmail}
+              onChange={(e) => setSignupEmail(e.target.value)}
             />
             {error && <p className='login-error'>{error}</p>}
+            {success && <p className='login-success'>{success}</p>}
             <button type='submit' className='btn btn-primary full'>
               회원가입
             </button>
@@ -254,7 +289,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
         )}
 
         {mode === 'find' && (
-          <form onSubmit={handleFind}>
+          <form onSubmit={findType === 'id' ? handleSendCode : handleResetPassword}>
             <div className='find-type'>
               <label>
                 <input
@@ -276,61 +311,90 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
               </label>
             </div>
 
-            {findType === 'password' && (
-              <input
-                type='text'
-                className='input'
-                placeholder='아이디'
-                value={findId}
-                onChange={(e) => setFindId(e.target.value)}
-              />
-            )}
-
-            <div className='find-question'>
-              <strong>본인확인 질문</strong>
-              <p>{auth.question || '등록된 질문이 없습니다.'}</p>
-            </div>
-
             <input
-              type='text'
+              type='email'
               className='input'
-              placeholder='본인확인 답변'
-              value={findAnswer}
-              onChange={(e) => setFindAnswer(e.target.value)}
+              placeholder='가입한 이메일'
+              value={findEmail}
+              onChange={(e) => setFindEmail(e.target.value)}
               autoFocus
             />
 
-            {findType === 'password' && (
+            {findType === 'id' && (
               <>
-                <input
-                  type='password'
-                  className='input'
-                  placeholder='새 비밀번호'
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                />
-                <input
-                  type='password'
-                  className='input'
-                  placeholder='새 비밀번호 확인'
-                  value={newPasswordConfirm}
-                  onChange={(e) => setNewPasswordConfirm(e.target.value)}
-                />
+                {error && <p className='login-error'>{error}</p>}
+                {success && <p className='login-success'>{success}</p>}
+                <button
+                  type='button'
+                  className='btn btn-primary full'
+                  onClick={() => handleSendCode()}
+                  disabled={sending}
+                >
+                  {sending ? '발송 중...' : '아이디 이메일로 받기'}
+                </button>
               </>
             )}
 
-            {error && <p className='login-error'>{error}</p>}
-            {success && <p className='login-success'>{success}</p>}
-            <button type='submit' className='btn btn-primary full'>
-              {findType === 'id' ? '아이디 찾기' : '비밀번호 재설정'}
-            </button>
+            {findType === 'password' && (
+              <>
+                {!codeSent ? (
+                  <button
+                    type='button'
+                    className='btn btn-primary full'
+                    onClick={() => handleSendCode()}
+                    disabled={sending}
+                  >
+                    {sending ? '발송 중...' : '인증번호 받기'}
+                  </button>
+                ) : (
+                  <>
+                    <input
+                      type='text'
+                      className='input'
+                      placeholder='이메일로 받은 인증번호'
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                    />
+                    <input
+                      type='password'
+                      className='input'
+                      placeholder='새 비밀번호'
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                    />
+                    <input
+                      type='password'
+                      className='input'
+                      placeholder='새 비밀번호 확인'
+                      value={newPasswordConfirm}
+                      onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                    />
+                    <button
+                      type='button'
+                      className='btn full'
+                      onClick={() => handleSendCode()}
+                      disabled={sending}
+                    >
+                      {sending ? '발송 중...' : '인증번호 재발송'}
+                    </button>
+                  </>
+                )}
+                {error && <p className='login-error'>{error}</p>}
+                {success && <p className='login-success'>{success}</p>}
+                {codeSent && (
+                  <button type='submit' className='btn btn-primary full'>
+                    비밀번호 재설정
+                  </button>
+                )}
+              </>
+            )}
           </form>
         )}
 
         <p className='login-hint'>
           {mode === 'login'
             ? '초기 아이디: admin / 비밀번호: 0000'
-            : '모든 정보는 이 브라우저에만 저장됩니다.'}
+            : '모든 정보는 이 브라우저와 서버에 저장됩니다.'}
         </p>
       </div>
     </div>

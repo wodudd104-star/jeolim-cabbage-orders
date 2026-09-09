@@ -1,16 +1,23 @@
 import React, { useState } from 'react';
 import { load, save } from '../lib/storage';
+import { updateServerAuth } from '../lib/api';
 
 const AUTH_KEY = 'jeolim-cabbage-auth-v1';
 const ORDERS_KEY = 'jeolim-cabbage-orders-v3';
 const CUSTOMERS_KEY = 'jeolim-cabbage-customers-v1';
 const PRODUCTS_KEY = 'jeolim-cabbage-products-v1';
 
-export function getStoredCredentials() {
-  return load(AUTH_KEY, { id: 'admin', password: '0000' });
+export type AdminAuth = {
+  id: string;
+  password: string;
+  email: string;
+};
+
+export function getStoredCredentials(): AdminAuth {
+  return load(AUTH_KEY, { id: 'admin', password: '0000', email: '' });
 }
 
-export function setStoredCredentials(credentials: { id: string; password: string }) {
+export function setStoredCredentials(credentials: AdminAuth) {
   save(AUTH_KEY, credentials);
 }
 
@@ -20,9 +27,10 @@ export default function Admin() {
   const [newId, setNewId] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
 
-  function handleCredentialsChange(e: React.FormEvent) {
+  async function handleCredentialsChange(e: React.FormEvent) {
     e.preventDefault();
     setMessage('');
     const auth = getStoredCredentials();
@@ -42,13 +50,24 @@ export default function Admin() {
       setMessage('새 비밀번호와 확인이 일치하지 않습니다.');
       return;
     }
-    setStoredCredentials({ id: newId, password: newPassword });
-    setCurrentId('');
-    setCurrentPassword('');
-    setNewId('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setMessage('아이디와 비밀번호가 변경되었습니다.');
+    if (!email.trim() || !email.includes('@')) {
+      setMessage('올바른 이메일을 입력해주세요.');
+      return;
+    }
+
+    try {
+      await updateServerAuth(currentId, currentPassword, newId, newPassword, email);
+      setStoredCredentials({ id: newId, password: newPassword, email });
+      setCurrentId('');
+      setCurrentPassword('');
+      setNewId('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setEmail('');
+      setMessage('아이디, 비밀번호, 이메일이 변경되었습니다.');
+    } catch (err: any) {
+      setMessage(err.message || '서버 연동 중 오류가 발생했습니다.');
+    }
   }
 
   function clearAllData() {
@@ -75,7 +94,7 @@ export default function Admin() {
       </header>
 
       <section className='panel'>
-        <h2>아이디 / 비밀번호 변경</h2>
+        <h2>아이디 / 비밀번호 / 이메일 변경</h2>
         <form onSubmit={handleCredentialsChange} className='admin-form'>
           <label>
             현재 아이디
@@ -127,9 +146,19 @@ export default function Admin() {
               placeholder='새 비밀번호 확인'
             />
           </label>
+          <label>
+            이메일 (ID/PW 찾기용)
+            <input
+              type='email'
+              className='input'
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder='이메일'
+            />
+          </label>
           {message && <p className='admin-message'>{message}</p>}
           <button type='submit' className='btn btn-primary'>
-            아이디 / 비밀번호 변경
+            변경 저장
           </button>
         </form>
       </section>
