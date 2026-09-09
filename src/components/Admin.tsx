@@ -6,41 +6,49 @@ const ORDERS_KEY = 'jeolim-cabbage-orders-v3';
 const CUSTOMERS_KEY = 'jeolim-cabbage-customers-v1';
 const PRODUCTS_KEY = 'jeolim-cabbage-products-v1';
 
-export function getStoredPassword(): string {
-  const auth = load(AUTH_KEY, { password: '0000' });
-  return auth.password;
+export function getStoredCredentials() {
+  return load(AUTH_KEY, { id: 'admin', password: '0000' });
 }
 
-export function setStoredPassword(password: string) {
-  save(AUTH_KEY, { password });
+export function setStoredCredentials(credentials: { id: string; password: string }) {
+  save(AUTH_KEY, credentials);
 }
 
 export default function Admin() {
-  const [current, setCurrent] = useState('');
-  const [next, setNext] = useState('');
+  const [currentId, setCurrentId] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newId, setNewId] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState('');
 
-  function handlePasswordChange(e: React.FormEvent) {
+  function handleCredentialsChange(e: React.FormEvent) {
     e.preventDefault();
     setMessage('');
-    if (current !== getStoredPassword()) {
-      setMessage('현재 비밀번호가 틀렸습니다.');
+    const auth = getStoredCredentials();
+    if (currentId !== auth.id || currentPassword !== auth.password) {
+      setMessage('현재 아이디 또는 비밀번호가 틀렸습니다.');
       return;
     }
-    if (!next.trim()) {
+    if (!newId.trim()) {
+      setMessage('새 아이디를 입력해주세요.');
+      return;
+    }
+    if (!newPassword.trim()) {
       setMessage('새 비밀번호를 입력해주세요.');
       return;
     }
-    if (next !== confirmPassword) {
+    if (newPassword !== confirmPassword) {
       setMessage('새 비밀번호와 확인이 일치하지 않습니다.');
       return;
     }
-    setStoredPassword(next);
-    setCurrent('');
-    setNext('');
+    setStoredCredentials({ id: newId, password: newPassword });
+    setCurrentId('');
+    setCurrentPassword('');
+    setNewId('');
+    setNewPassword('');
     setConfirmPassword('');
-    setMessage('비밀번호가 변경되었습니다.');
+    setMessage('아이디와 비밀번호가 변경되었습니다.');
   }
 
   function clearAllData() {
@@ -67,16 +75,36 @@ export default function Admin() {
       </header>
 
       <section className='panel'>
-        <h2>비밀번호 변경</h2>
-        <form onSubmit={handlePasswordChange} className='admin-form'>
+        <h2>아이디 / 비밀번호 변경</h2>
+        <form onSubmit={handleCredentialsChange} className='admin-form'>
+          <label>
+            현재 아이디
+            <input
+              type='text'
+              className='input'
+              value={currentId}
+              onChange={(e) => setCurrentId(e.target.value)}
+              placeholder='현재 아이디'
+            />
+          </label>
           <label>
             현재 비밀번호
             <input
               type='password'
               className='input'
-              value={current}
-              onChange={(e) => setCurrent(e.target.value)}
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder='현재 비밀번호'
+            />
+          </label>
+          <label>
+            새 아이디
+            <input
+              type='text'
+              className='input'
+              value={newId}
+              onChange={(e) => setNewId(e.target.value)}
+              placeholder='새 아이디'
             />
           </label>
           <label>
@@ -84,8 +112,8 @@ export default function Admin() {
             <input
               type='password'
               className='input'
-              value={next}
-              onChange={(e) => setNext(e.target.value)}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
               placeholder='새 비밀번호'
             />
           </label>
@@ -101,7 +129,7 @@ export default function Admin() {
           </label>
           {message && <p className='admin-message'>{message}</p>}
           <button type='submit' className='btn btn-primary'>
-            비밀번호 변경
+            아이디 / 비밀번호 변경
           </button>
         </form>
       </section>
