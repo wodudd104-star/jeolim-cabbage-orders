@@ -200,12 +200,40 @@ app.post('/api/users/:id/deactivate', async (req, res) => {
   res.json({ success: true });
 });
 
+app.post('/api/users/:id/promote', async (req, res) => {
+  const data = await loadAuthData();
+  const user = data.users.find((u) => u.id === req.params.id);
+  if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+  user.role = 'admin';
+  user.active = true;
+  await saveAuthData(data);
+  res.json({ success: true });
+});
+
+app.post('/api/users/:id/demote', async (req, res) => {
+  const data = await loadAuthData();
+  const user = data.users.find((u) => u.id === req.params.id);
+  if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+  if (user.id === 'admin') {
+    return res.status(403).json({ error: '기본 관리자 계정은 일반 사용자로 변경할 수 없습니다.' });
+  }
+  user.role = 'user';
+  await saveAuthData(data);
+  res.json({ success: true });
+});
+
 app.delete('/api/users/:id', async (req, res) => {
   const data = await loadAuthData();
   const idx = data.users.findIndex((u) => u.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
-  if (data.users[idx].role === 'admin') {
-    return res.status(403).json({ error: '관리자 계정은 삭제할 수 없습니다.' });
+  // 자기 자신은 삭제 불가
+  // (요청자 정보를 알 수 없으므로 클라이언트에서 제어)
+  // 기본 admin 계정은 다른 관리자가 존재할 때만 삭제 가능
+  if (data.users[idx].id === 'admin') {
+    const otherAdmins = data.users.filter((u) => u.role === 'admin' && u.id !== 'admin');
+    if (otherAdmins.length === 0) {
+      return res.status(403).json({ error: '다른 관리자가 없어 기본 관리자를 삭제할 수 없습니다.' });
+    }
   }
   data.users.splice(idx, 1);
   await saveAuthData(data);

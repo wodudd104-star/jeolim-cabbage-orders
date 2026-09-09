@@ -65,6 +65,24 @@ export async function deactivateUser(id: string) {
   return data;
 }
 
+export async function promoteUser(id: string) {
+  const res = await fetch(getUrl(`/api/users/${encodeURIComponent(id)}/promote`), {
+    method: 'POST',
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || '관리자 임명 실패');
+  return data;
+}
+
+export async function demoteUser(id: string) {
+  const res = await fetch(getUrl(`/api/users/${encodeURIComponent(id)}/demote`), {
+    method: 'POST',
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || '일반 사용자로 변경 실패');
+  return data;
+}
+
 export async function deleteUser(id: string) {
   const res = await fetch(getUrl(`/api/users/${encodeURIComponent(id)}`), {
     method: 'DELETE',

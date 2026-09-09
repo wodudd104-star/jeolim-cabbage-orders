@@ -4,7 +4,9 @@ import {
   activateUser,
   deactivateUser,
   deleteUser,
+  demoteUser,
   fetchUsers,
+  promoteUser,
   updateServerAuth,
 } from '../lib/api';
 
@@ -110,6 +112,24 @@ export default function Admin() {
       loadUserList();
     } catch (err: any) {
       setMessage(err.message || '상태 변경 실패');
+    }
+  }
+
+  async function promote(user: typeof users[number]) {
+    try {
+      await promoteUser(user.id);
+      loadUserList();
+    } catch (err: any) {
+      setMessage(err.message || '관리자 임명 실패');
+    }
+  }
+
+  async function demote(user: typeof users[number]) {
+    try {
+      await demoteUser(user.id);
+      loadUserList();
+    } catch (err: any) {
+      setMessage(err.message || '일반 사용자로 변경 실패');
     }
   }
 
@@ -243,7 +263,17 @@ export default function Admin() {
                       {user.active ? '비활성화' : '활성화'}
                     </button>
                   )}
-                  {user.role !== 'admin' && user.id !== currentUser.id && (
+                  {user.role !== 'admin' && (
+                    <button className='btn btn-primary' onClick={() => promote(user)}>
+                      관리자 임명
+                    </button>
+                  )}
+                  {user.role === 'admin' && user.id !== 'admin' && (
+                    <button className='btn' onClick={() => demote(user)}>
+                      사용자로 변경
+                    </button>
+                  )}
+                  {user.id !== currentUser.id && (
                     <button
                       className='btn icon danger'
                       onClick={() => removeUser(user)}
