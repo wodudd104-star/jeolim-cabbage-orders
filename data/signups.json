@@ -5,5 +5,12 @@
     "role": "user",
     "active": false,
     "loggedAt": "2026-09-09T13:31:59.519Z"
+  },
+  {
+    "id": "cksdudd102",
+    "email": "cksdudd102@naver.com",
+    "role": "user",
+    "active": false,
+    "loggedAt": "2026-09-09T13:37:11.192Z"
   }
 ]
