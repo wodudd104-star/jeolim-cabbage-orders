@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { load, save } from '../lib/storage';
 import {
+  fetchAuthInfo,
   findIdByEmail,
   registerAccount,
   resetPassword,
@@ -8,6 +9,7 @@ import {
 } from '../lib/api';
 
 const AUTH_SESSION_KEY = 'jeolim-auth-session';
+const AUTH_ROLE_KEY = 'jeolim-auth-role';
 const AUTH_KEY = 'jeolim-cabbage-auth-v1';
 
 export type AuthCredentials = {
@@ -22,6 +24,7 @@ export function isLoggedIn() {
 
 export function logout() {
   sessionStorage.removeItem(AUTH_SESSION_KEY);
+  sessionStorage.removeItem(AUTH_ROLE_KEY);
 }
 
 export function getStoredCredentials(): AuthCredentials {
@@ -30,6 +33,10 @@ export function getStoredCredentials(): AuthCredentials {
 
 export function setStoredCredentials(auth: AuthCredentials) {
   save(AUTH_KEY, auth);
+}
+
+export function isAdmin(): boolean {
+  return sessionStorage.getItem(AUTH_ROLE_KEY) === 'admin';
 }
 
 type LoginMode = 'login' | 'signup' | 'find';
@@ -79,7 +86,13 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
     const auth = getStoredCredentials();
     if (id === auth.id && password === auth.password) {
       sessionStorage.setItem(AUTH_SESSION_KEY, '1');
-      onLogin();
+      fetchAuthInfo().then((info) => {
+        sessionStorage.setItem(AUTH_ROLE_KEY, info?.role === 'admin' ? 'admin' : 'user');
+      }).catch(() => {
+        sessionStorage.setItem(AUTH_ROLE_KEY, 'admin');
+      }).finally(() => {
+        onLogin();
+      });
     } else {
       setError('아이디 또는 비밀번호가 틀렸습니다.');
     }

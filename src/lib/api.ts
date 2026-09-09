@@ -18,6 +18,13 @@ export async function sendSms(recipients: string[], message: string) {
   return data;
 }
 
+export async function fetchAuthInfo() {
+  const res = await fetch(getUrl('/api/auth-info'));
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || '인증 정보 조회 실패');
+  return data as { id: string; email: string; role: string } | null;
+}
+
 export async function registerAccount(id: string, password: string, email: string) {
   const res = await fetch(getUrl('/api/register'), {
     method: 'POST',

@@ -5,7 +5,7 @@ import './style.css';
 import { sendSms } from './lib/api';
 import { load, save } from './lib/storage';
 import { Order, Product, OrderStatus, PickupType, PaymentStatus, Page } from './types';
-import Login, { isLoggedIn, logout } from './components/Login';
+import Login, { isAdmin, isLoggedIn, logout } from './components/Login';
 import Customers from './components/Customers';
 import Admin from './components/Admin';
 
@@ -278,12 +278,14 @@ export default function App() {
               >
                 고객
               </button>
-              <button
-                className={`btn ${page === 'admin' ? 'active' : ''}`}
-                onClick={() => setPage('admin')}
-              >
-                관리자
-              </button>
+              {isAdmin() && (
+                <button
+                  className={`btn ${page === 'admin' ? 'active' : ''}`}
+                  onClick={() => setPage('admin')}
+                >
+                  관리자
+                </button>
+              )}
             </nav>
             {page === 'orders' && (
               <>

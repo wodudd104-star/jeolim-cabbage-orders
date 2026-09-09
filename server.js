@@ -92,9 +92,11 @@ app.post('/api/register', async (req, res) => {
   if (!id || !password || !email) {
     return res.status(400).json({ error: '아이디, 비밀번호, 이메일을 모두 입력해주세요.' });
   }
+  const existing = await loadServerAuth();
+  const role = existing ? 'user' : 'admin';
   const { salt, hash } = hashPassword(password);
-  await saveServerAuth({ id, salt, hash, email });
-  res.json({ success: true });
+  await saveServerAuth({ id, salt, hash, email, role });
+  res.json({ success: true, role });
 });
 
 app.post('/api/find-id', async (req, res) => {
@@ -165,6 +167,12 @@ app.post('/api/update-auth', async (req, res) => {
   }
   await saveServerAuth(next);
   res.json({ success: true, id: next.id });
+});
+
+app.get('/api/auth-info', async (_req, res) => {
+  const auth = await loadServerAuth();
+  if (!auth) return res.json(null);
+  res.json({ id: auth.id, email: auth.email, role: auth.role || 'admin' });
 });
 
 function getAuthHeader(apiKey, apiSecret) {
