@@ -19,7 +19,7 @@ function getAuthHeader(apiKey, apiSecret) {
   const signature = crypto
     .createHmac('sha256', apiSecret)
     .update(date + salt)
-    .digest('base64');
+    .digest('hex');
   return `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
 }
 
