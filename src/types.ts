@@ -23,6 +23,7 @@ export type Order = {
   depositAmount: number;
   pickup: PickupType;
   pickupDate: string;
+  preparationDate?: string;
   address: string;
   memo: string;
   status: OrderStatus;

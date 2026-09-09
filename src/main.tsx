@@ -20,7 +20,7 @@ const defaultProducts: Product[] = [
   { id: 'p3', name: '소금 절임배추', unit: 'kg', price: 8000 },
 ];
 
-function formatDate(date: string) {
+function formatDate(date: string | undefined) {
   if (!date) return '-';
   const d = new Date(date);
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
@@ -56,6 +56,7 @@ const emptyOrder: Omit<Order, 'id' | 'createdAt'> = {
   depositAmount: 0,
   pickup: '매장방문',
   pickupDate: '',
+  preparationDate: '',
   address: '',
   memo: '',
   status: '접수',
@@ -179,7 +180,20 @@ export default function App() {
   }
 
   function updateStatus(id: string, status: OrderStatus) {
-    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+    setOrders((prev) =>
+      prev.map((o) => {
+        if (o.id !== id) return o;
+        const patch: Partial<Order> = { status };
+        if (status === '준비중' && !o.preparationDate) {
+          patch.preparationDate = new Date().toISOString().slice(0, 10);
+        }
+        return { ...o, ...patch };
+      })
+    );
+  }
+
+  function updatePreparationDate(id: string, date: string) {
+    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, preparationDate: date } : o)));
   }
 
   function toggleDeposit(id: string) {
@@ -190,7 +204,7 @@ export default function App() {
         return {
           ...o,
           deposit: nextDeposit,
-          depositAmount: nextDeposit ? o.totalPrice : o.depositAmount,
+          depositAmount: nextDeposit ? o.totalPrice : 0,
         };
       })
     );
@@ -229,6 +243,7 @@ export default function App() {
       입금상태: getPaymentStatus(o),
       입금확인: o.deposit ? 'Y' : 'N',
       상태: o.status,
+      준비일: formatDate(o.preparationDate),
       수령방식: o.pickup,
       희망일: formatDate(o.pickupDate),
       주소: o.address,
@@ -490,6 +505,15 @@ export default function App() {
                         onChange={(e) => setForm({ ...form, pickupDate: e.target.value })}
                       />
                     </label>
+                    <label>
+                      준비일 (접수→준비중 전환일)
+                      <input
+                        className='input'
+                        type='date'
+                        value={form.preparationDate}
+                        onChange={(e) => setForm({ ...form, preparationDate: e.target.value })}
+                      />
+                    </label>
                     {form.pickup === '배송' && (
                       <label className='full'>
                         배송 주소
@@ -547,6 +571,15 @@ export default function App() {
                           <span className='order-name'>{order.name}</span>
                           <span className='order-phone'>{order.phone || '연락처 없음'}</span>
                           <span className='order-date'>{formatDate(order.pickupDate)}</span>
+                          {order.status !== '접수' && (
+                            <input
+                              type='date'
+                              className='input prep-date'
+                              value={order.preparationDate || ''}
+                              onChange={(e) => updatePreparationDate(order.id, e.target.value)}
+                              title='준비일'
+                            />
+                          )}
                           <span className={`tag payment-${payment}`}>{payment}</span>
                         </div>
                         <div className='order-actions'>
@@ -687,6 +720,12 @@ function Receipt({ order }: { order: Order }) {
         <span>수령방식</span>
         <span>{order.pickup}</span>
       </div>
+      {order.preparationDate && (
+        <div className='receipt-line'>
+          <span>준비일</span>
+          <span>{formatDate(order.preparationDate)}</span>
+        </div>
+      )}
       {order.pickupDate && (
         <div className='receipt-line'>
           <span>수령희망일</span>
