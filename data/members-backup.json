@@ -24,7 +24,7 @@
       "salt": "380b8473-be08-4d90-9eaf-1586f90bc6a0",
       "hash": "56a17ab1df4f91fb19e639dfe58ddcb4145b131e6aad249a44807025ff4e4f48",
       "role": "user",
-      "active": false,
+      "active": true,
       "createdAt": "2026-09-09T13:54:01.053Z"
     }
   ]
