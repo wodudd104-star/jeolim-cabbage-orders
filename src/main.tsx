@@ -269,16 +269,25 @@ export default function App() {
     <main className='app-shell'>
       <div className='container'>
         <header className='app-header'>
-          <div>
-            <p className='eyebrow'>절임배추 관리</p>
-            <h1>
-              {page === 'orders'
-                ? '주문 관리'
-                : page === 'customers'
-                ? '고객 관리'
-                : '관리자 설정'}
-            </h1>
-          </div>
+          <button className='brand' onClick={() => setPage('orders')} title='초기 화면으로 이동'>
+            <span className='brand-icon'>
+              <svg viewBox='0 0 24 24' width='32' height='32' fill='none' xmlns='http://www.w3.org/2000/svg'>
+                <circle cx='12' cy='12' r='10' fill='#16a34a'/>
+                <path d='M12 6c-3 0-5.5 2.5-5.5 6s2.5 6 5.5 6 5.5-2.5 5.5-6-2.5-6-5.5-6z' fill='#dcfce7'/>
+                <path d='M12 10c-1.5 0-2.5 1-2.5 2.5s1 2.5 2.5 2.5 2.5-1 2.5-2.5-1-2.5-2.5-2.5z' fill='#16a34a'/>
+              </svg>
+            </span>
+            <div className='brand-text'>
+              <p className='eyebrow'>절임배추 관리</p>
+              <h1>
+                {page === 'orders'
+                  ? '주문 관리'
+                  : page === 'customers'
+                  ? '고객 관리'
+                  : '관리자 설정'}
+              </h1>
+            </div>
+          </button>
           <div className='header-actions'>
             <nav className='nav-tabs'>
               <button
