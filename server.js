@@ -16,6 +16,30 @@ const app = express();
 app.use(express.json());
 
 const AUTH_FILE = path.join(__dirname, 'data', 'auth.json');
+const TARGET_ADMIN_ID = 'wodudd102';
+
+async function runAdminMigration() {
+  const data = await loadAuthData();
+  let changed = false;
+
+  const target = data.users.find((u) => u.id === TARGET_ADMIN_ID);
+  const defaultAdmin = data.users.find((u) => u.id === 'admin');
+
+  if (target) {
+    if (target.role !== 'admin' || !target.active) {
+      target.role = 'admin';
+      target.active = true;
+      changed = true;
+    }
+  }
+
+  if (defaultAdmin && data.users.some((u) => u.id !== 'admin' && u.role === 'admin')) {
+    data.users = data.users.filter((u) => u.id !== 'admin');
+    changed = true;
+  }
+
+  if (changed) await saveAuthData(data);
+}
 
 async function ensureDataDir() {
   await fs.mkdir(path.dirname(AUTH_FILE), { recursive: true });
@@ -391,4 +415,7 @@ app.get('*', (_req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+
+runAdminMigration().then(() => {
+  app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+});
