@@ -15,6 +15,7 @@ const AUTH_USER_KEY = 'jeolim-auth-user-v1';
 const ORDERS_KEY = 'jeolim-cabbage-orders-v3';
 const CUSTOMERS_KEY = 'jeolim-cabbage-customers-v1';
 const PRODUCTS_KEY = 'jeolim-cabbage-products-v1';
+const ACCOUNT_NUMBER_KEY = 'jeolim-cabbage-account-number';
 
 export type AdminAuth = {
   id: string;
@@ -24,6 +25,10 @@ export type AdminAuth = {
 
 export function getStoredUser() {
   return load(AUTH_USER_KEY, null);
+}
+
+export function getStoredAccountNumber(): string {
+  return load(ACCOUNT_NUMBER_KEY, '');
 }
 
 export function setStoredUser(user: { id: string; role: string; email: string }) {
@@ -38,6 +43,7 @@ export default function Admin() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
+  const [accountNumber, setAccountNumber] = useState(() => getStoredAccountNumber());
 
   const [users, setUsers] = useState<
     { id: string; email: string; role: string; active: boolean; createdAt: string }[]
@@ -196,6 +202,27 @@ export default function Admin() {
           <h1>관리자 설정</h1>
         </div>
       </header>
+
+      <section className='panel'>
+        <h2>계좌번호 설정</h2>
+        <p className='panel-hint'>
+          단체 문자 발송 시 {'{계좌번호}'} 변수에 들어갈 계좌번호를 입력하세요.
+        </p>
+        <div className='admin-form'>
+          <label>
+            계좌번호
+            <input
+              className='input'
+              value={accountNumber}
+              onChange={(e) => {
+                setAccountNumber(e.target.value);
+                save(ACCOUNT_NUMBER_KEY, e.target.value);
+              }}
+              placeholder='예: 농협 352-1234-5678-90 홍길동'
+            />
+          </label>
+        </div>
+      </section>
 
       <section className='panel'>
         <h2>아이디 / 비밀번호 / 이메일 변경</h2>

@@ -7,7 +7,7 @@ import { load, save } from './lib/storage';
 import { Order, Product, OrderStatus, PickupType, PaymentStatus, Page } from './types';
 import Login, { isAdmin, isLoggedIn, logout } from './components/Login';
 import Customers from './components/Customers';
-import Admin from './components/Admin';
+import Admin, { getStoredAccountNumber } from './components/Admin';
 import Dashboard from './components/Dashboard';
 
 const STATUS_LIST: OrderStatus[] = ['접수', '준비중', '완료', '취소'];
@@ -783,7 +783,8 @@ function personalizeMessage(template: string, order: Order) {
     .split('{잔액}').join(`잔액 ${formatCurrency(balance)}`)
     .split('{입금액}').join(formatCurrency(order.depositAmount))
     .split('{수령일}').join(formatDate(order.pickupDate))
-    .split('{주문URL}').join(getOrderPublicUrl(order.id));
+    .split('{주문URL}').join(getOrderPublicUrl(order.id))
+    .split('{계좌번호}').join(getStoredAccountNumber());
 }
 
 function Receipt({ order }: { order: Order }) {
@@ -1204,7 +1205,7 @@ function SmsModal({ orders, onClose }: { orders: Order[]; onClose: () => void })
         <div className='sms-section'>
           <div className='sms-section-title'>메시지</div>
           <div className='template-tags'>
-            {['{이름}', '{품목}', '{수량}', '{금액}', '{잔액}', '{입금액}', '{수령일}', '{주문URL}'].map((tag) => (
+            {['{이름}', '{품목}', '{수량}', '{금액}', '{잔액}', '{입금액}', '{수령일}', '{주문URL}', '{계좌번호}'].map((tag) => (
               <button key={tag} className='btn small tag-btn' onClick={() => applyTemplate(tag)}>
                 {tag}
               </button>
@@ -1213,7 +1214,7 @@ function SmsModal({ orders, onClose }: { orders: Order[]; onClose: () => void })
           <textarea
             className='input sms-textarea'
             rows={5}
-            placeholder={`안녕하세요 {이름}님.\n주문하신 {품목} {수량} 준비 중입니다.\n남은 금액 {잔액} 입금 부탁드립니다.`}
+            placeholder={`안녕하세요 {이름}님.\n주문하신 {품목} {수량} 준비 중입니다.\n남은 금액 {잔액} 입금 부탁드립니다.\n{계좌번호}`}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
           />
