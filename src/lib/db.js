@@ -3,15 +3,11 @@ import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(execFile);
+import fetch from 'node-fetch';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PROJECT_ROOT = process.cwd();
 const AUTH_FILE = path.join(__dirname, 'data', 'auth.json');
 const AUTH_BACKUP_FILE = path.join(__dirname, 'data', 'members-backup.json');
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -71,9 +67,25 @@ async function loadJsonUsers() {
     try {
       const raw = await fs.readFile(AUTH_BACKUP_FILE, 'utf-8');
       parsed = JSON.parse(raw);
-      console.log('Restored users from members-backup.json');
+      console.log('[DB] Restored users from members-backup.json');
     } catch {
       parsed = null;
+    }
+  }
+
+  if (!parsed && GITHUB_TOKEN) {
+    const remote = await fetchRepoFromGitHub();
+    if (remote) {
+      try {
+        const data = await fetchFileFromGitHub(remote, 'data/auth.json');
+        if (data) {
+          parsed = data;
+          console.log('[DB] Restored users from GitHub data/auth.json');
+          await saveJsonUsersLocal(parsed);
+        }
+      } catch (err) {
+        console.error('[DB] Failed to fetch auth.json from GitHub:', err.message);
+      }
     }
   }
 
@@ -96,38 +108,107 @@ async function loadJsonUsers() {
   return [];
 }
 
-async function saveJsonUsers(users) {
+async function saveJsonUsersLocal(users) {
   await fs.mkdir(path.dirname(AUTH_FILE), { recursive: true });
   const payload = JSON.stringify({ users }, null, 2);
   await fs.writeFile(AUTH_FILE, payload);
   await fs.writeFile(AUTH_BACKUP_FILE, payload);
-  await commitToGit([AUTH_FILE, AUTH_BACKUP_FILE]);
 }
 
-async function commitToGit(files) {
-  if (!GITHUB_TOKEN) return;
+async function saveJsonUsers(users) {
+  await saveJsonUsersLocal(users);
+  if (GITHUB_TOKEN) {
+    await commitFilesToGitHub([
+      { path: 'data/auth.json', content: JSON.stringify({ users }, null, 2) },
+      { path: 'data/members-backup.json', content: JSON.stringify({ users }, null, 2) },
+    ]);
+  }
+}
+
+async function getGitHubRepo() {
+  if (process.env.GITHUB_REPO) return process.env.GITHUB_REPO;
   try {
-    await execAsync('git', ['config', 'user.email', 'render@jeolim.local'], { cwd: PROJECT_ROOT });
-    await execAsync('git', ['config', 'user.name', 'Render Auto Commit'], { cwd: PROJECT_ROOT });
-    await execAsync('git', ['add', ...files], { cwd: PROJECT_ROOT });
+    const pkgRaw = await fs.readFile(path.join(process.cwd(), 'package.json'), 'utf-8');
+    const pkg = JSON.parse(pkgRaw);
+    const url = pkg.repository?.url || '';
+    const match = url.match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/);
+    if (match) return `${match[1]}/${match[2]}`;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+async function fetchRepoFromGitHub() {
+  return getGitHubRepo();
+}
+
+async function fetchFileFromGitHub(repo, filePath) {
+  const res = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}`, {
+    headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const body = await res.json();
+  if (!body.content) return null;
+  const decoded = Buffer.from(body.content, 'base64').toString('utf-8');
+  return JSON.parse(decoded);
+}
+
+async function commitFilesToGitHub(files) {
+  const repo = await getGitHubRepo();
+  if (!repo) {
+    console.error('[AUTO-COMMIT] GITHUB_REPO or package.json repository not set');
+    return;
+  }
+
+  for (const file of files) {
     try {
-      await execAsync('git', ['commit', '-m', 'auto: update member data'], { cwd: PROJECT_ROOT });
-    } catch {
-      // 변경사항 없음
+      const getRes = await fetch(`https://api.github.com/repos/${repo}/contents/${file.path}`, {
+        headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
+      });
+      let sha = null;
+      if (getRes.ok) {
+        const body = await getRes.json();
+        sha = body.sha;
+      } else if (getRes.status !== 404) {
+        throw new Error(`GET ${file.path} HTTP ${getRes.status}`);
+      }
+
+      const putRes = await fetch(`https://api.github.com/repos/${repo}/contents/${file.path}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `auto: update ${file.path}`,
+          content: Buffer.from(file.content).toString('base64'),
+          sha,
+        }),
+      });
+      if (!putRes.ok) {
+        const err = await putRes.text();
+        throw new Error(`PUT ${file.path} HTTP ${putRes.status}: ${err}`);
+      }
+      console.log(`[AUTO-COMMIT] ${file.path} updated on GitHub.`);
+    } catch (err) {
+      console.error(`[AUTO-COMMIT] ${file.path} failed:`, err.message);
     }
-    const remoteResult = await execAsync('git', ['remote', 'get-url', 'origin'], { cwd: PROJECT_ROOT });
-    const remoteUrl = remoteResult.stdout.trim();
-    if (!remoteUrl) return;
-    const authRemote = remoteUrl.replace(/^https:\/\//, `https://${GITHUB_TOKEN}@`);
-    await execAsync('git', ['push', authRemote, 'HEAD:main'], { cwd: PROJECT_ROOT });
-    console.log('[AUTO-COMMIT] Member data pushed to GitHub.');
-  } catch (err) {
-    console.error('[AUTO-COMMIT] Failed:', err.message);
   }
 }
 
 export async function commitDataFiles(files) {
-  await commitToGit(files);
+  if (!GITHUB_TOKEN) return;
+  const repo = await getGitHubRepo();
+  if (!repo) return;
+  const list = [];
+  for (const f of files) {
+    try {
+      const content = await fs.readFile(f, 'utf-8');
+      list.push({ path: path.relative(process.cwd(), f).replace(/\\/g, '/'), content });
+    } catch {
+      // ignore missing
+    }
+  }
+  await commitFilesToGitHub(list);
 }
 
 function rowToUser(row) {
