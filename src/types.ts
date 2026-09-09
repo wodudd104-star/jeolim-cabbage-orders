@@ -38,4 +38,4 @@ export type Customer = {
   memo: string;
 };
 
-export type Page = 'orders' | 'customers';
+export type Page = 'orders' | 'customers' | 'admin';

@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { Customer, Order } from '../types';
 import { load, save } from '../lib/storage';
 
@@ -19,6 +20,16 @@ function formatPhone(value: string) {
   return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`;
 }
 
+function getCell(row: Record<string, any>, keys: string[]): string {
+  for (const key of keys) {
+    const value = row[key];
+    if (value !== undefined && value !== null && value !== '') {
+      return String(value).trim();
+    }
+  }
+  return '';
+}
+
 export default function Customers({ orders }: { orders: Order[] }) {
   const [customers, setCustomers] = useState<Customer[]>(() => loadCustomers());
   const [search, setSearch] = useState('');
@@ -30,6 +41,7 @@ export default function Customers({ orders }: { orders: Order[] }) {
     address: '',
     memo: '',
   });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     const term = search.trim();
@@ -76,6 +88,11 @@ export default function Customers({ orders }: { orders: Order[] }) {
     setIsFormOpen(true);
   }
 
+  function commitCustomers(next: Customer[]) {
+    setCustomers(next);
+    saveCustomers(next);
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) {
@@ -86,17 +103,14 @@ export default function Customers({ orders }: { orders: Order[] }) {
       const updated = customers.map((c) =>
         c.id === editingId ? { ...c, ...form } : c
       );
-      setCustomers(updated);
-      saveCustomers(updated);
+      commitCustomers(updated);
     } else {
       const newCustomer: Customer = {
         ...form,
         id: crypto.randomUUID(),
         createdAt: new Date().toISOString(),
       };
-      const updated = [...customers, newCustomer];
-      setCustomers(updated);
-      saveCustomers(updated);
+      commitCustomers([...customers, newCustomer]);
     }
     resetForm();
     setIsFormOpen(false);
@@ -104,10 +118,67 @@ export default function Customers({ orders }: { orders: Order[] }) {
 
   function removeCustomer(id: string) {
     if (confirm('이 고객을 삭제할까요?')) {
-      const updated = customers.filter((c) => c.id !== id);
-      setCustomers(updated);
-      saveCustomers(updated);
+      commitCustomers(customers.filter((c) => c.id !== id));
     }
+  }
+
+  function exportCustomers() {
+    const rows = customers.map((c) => ({
+      이름: c.name,
+      연락처: c.phone,
+      주소: c.address,
+      메모: c.memo,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '고객목록');
+    XLSX.writeFile(wb, `절임배추_고객목록_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet) as Record<string, any>[];
+
+        const imported: Customer[] = rows
+          .map((row) => ({
+            name: getCell(row, ['이름', 'Name', '고객명', 'name', '성명']),
+            phone: getCell(row, ['연락처', 'Phone', '전화번호', 'phone', '휴폰', '휴 대폰']),
+            address: getCell(row, ['주소', 'Address', 'address', '배송주소']),
+            memo: getCell(row, ['메모', 'Memo', 'memo', '특이사항', '비고']),
+          }))
+          .filter((c) => c.name || c.phone)
+          .map((c) => ({
+            id: crypto.randomUUID(),
+            createdAt: new Date().toISOString(),
+            name: c.name,
+            phone: formatPhone(c.phone),
+            address: c.address,
+            memo: c.memo,
+          }));
+
+        if (imported.length === 0) {
+          alert('업로드할 고객 데이터가 없습니다. 엑셀 형식을 확인해주세요.');
+          return;
+        }
+
+        if (confirm(`${imported.length}명의 고객을 추가할까요?`)) {
+          commitCustomers([...customers, ...imported]);
+        }
+      } catch (err) {
+        alert('엑셀 파일을 읽는 중 오류가 발생했습니다.');
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
   }
 
   return (
@@ -118,6 +189,19 @@ export default function Customers({ orders }: { orders: Order[] }) {
           <h1>고객 관리</h1>
         </div>
         <div className='header-actions'>
+          <button className='btn' onClick={exportCustomers}>
+            📤 엑셀 저장
+          </button>
+          <button className='btn' onClick={() => fileInputRef.current?.click()}>
+            📥 엑셀 불러오기
+          </button>
+          <input
+            ref={fileInputRef}
+            type='file'
+            accept='.xlsx,.xls,.csv'
+            style={{ display: 'none' }}
+            onChange={handleFileSelect}
+          />
           <button className='btn btn-primary' onClick={openNewForm}>
             + 새 고객
           </button>

@@ -883,3 +883,53 @@ h1 {
   gap: 8px;
 }
 
+.admin-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 400px;
+}
+
+.admin-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.admin-message {
+  margin: 0;
+  padding: 10px;
+  border-radius: var(--radius);
+  background: #ecfdf5;
+  color: var(--primary-dark);
+  font-size: 0.9rem;
+}
+
+.danger-panel {
+  border-left: 4px solid var(--danger);
+}
+
+.danger-panel p {
+  color: #6b7280;
+  margin-bottom: 16px;
+}
+
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+

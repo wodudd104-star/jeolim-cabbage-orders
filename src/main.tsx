@@ -7,6 +7,7 @@ import { load, save } from './lib/storage';
 import { Order, Product, OrderStatus, PickupType, PaymentStatus, Page } from './types';
 import Login, { isLoggedIn, logout } from './components/Login';
 import Customers from './components/Customers';
+import Admin from './components/Admin';
 
 const STATUS_LIST: OrderStatus[] = ['접수', '준비중', '완료', '취소'];
 const PICKUP_LIST: PickupType[] = ['매장방문', '배송'];
@@ -255,7 +256,13 @@ export default function App() {
         <header className='app-header'>
           <div>
             <p className='eyebrow'>절임배추 관리</p>
-            <h1>{page === 'orders' ? '주문 관리' : '고객 관리'}</h1>
+            <h1>
+              {page === 'orders'
+                ? '주문 관리'
+                : page === 'customers'
+                ? '고객 관리'
+                : '관리자 설정'}
+            </h1>
           </div>
           <div className='header-actions'>
             <nav className='nav-tabs'>
@@ -270,6 +277,12 @@ export default function App() {
                 onClick={() => setPage('customers')}
               >
                 고객
+              </button>
+              <button
+                className={`btn ${page === 'admin' ? 'active' : ''}`}
+                onClick={() => setPage('admin')}
+              >
+                관리자
               </button>
             </nav>
             {page === 'orders' && (
@@ -293,6 +306,8 @@ export default function App() {
 
         {page === 'customers' ? (
           <Customers orders={orders} />
+        ) : page === 'admin' ? (
+          <Admin />
         ) : (
           <>
             <section className='summary'>
