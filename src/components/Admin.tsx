@@ -243,7 +243,7 @@ export default function Admin() {
                       {user.active ? '비활성화' : '활성화'}
                     </button>
                   )}
-                  {user.role !== 'admin' && (
+                  {user.role !== 'admin' && user.id !== currentUser.id && (
                     <button
                       className='btn icon danger'
                       onClick={() => removeUser(user)}

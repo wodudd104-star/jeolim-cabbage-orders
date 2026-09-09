@@ -120,13 +120,9 @@ app.post('/api/login', async (req, res) => {
     return res.status(400).json({ error: '아이디와 비밀번호를 입력해주세요.' });
   }
 
-  const data = await loadAuthData();
-
-  // 서버에 계정이 하나도 없으면 기본 관리자 로그인 허용
-  if (data.users.length === 0) {
-    if (id === 'admin' && password === '0000') {
-      return res.json({ id: 'admin', role: 'admin', active: true });
-    }
+  // 기본 관리자 계정은 항상 로그인 가능
+  if (id === 'admin' && password === '0000') {
+    return res.json({ id: 'admin', role: 'admin', active: true, email: '' });
   }
 
   const user = await findUserById(id);
@@ -156,15 +152,14 @@ app.post('/api/register', async (req, res) => {
     return res.status(409).json({ error: '이미 사용 중인 이메일입니다.' });
   }
 
-  const isFirst = data.users.length === 0;
   const { salt, hash } = hashPassword(password);
   const newUser = {
     id,
     email,
     salt,
     hash,
-    role: isFirst ? 'admin' : 'user',
-    active: isFirst,
+    role: 'user',
+    active: false,
     createdAt: new Date().toISOString(),
   };
   data.users.push(newUser);

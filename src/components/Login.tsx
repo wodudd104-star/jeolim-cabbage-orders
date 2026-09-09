@@ -116,11 +116,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
     }
     try {
       const data = await registerAccount(signupId, signupPassword, signupEmail);
-      if (data.role === 'admin' && data.active) {
-        setSuccess('관리자 회원가입이 완료되었습니다. 로그인해주세요.');
-      } else {
-        setSuccess('회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인 가능합니다.');
-      }
+      setSuccess('회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인 가능합니다.');
       setMode('login');
       setId(signupId);
       setSignupId('');
