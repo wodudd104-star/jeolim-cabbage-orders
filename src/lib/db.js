@@ -3,13 +3,19 @@ import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(execFile);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const PROJECT_ROOT = process.cwd();
 const AUTH_FILE = path.join(__dirname, 'data', 'auth.json');
 const AUTH_BACKUP_FILE = path.join(__dirname, 'data', 'members-backup.json');
 const DATABASE_URL = process.env.DATABASE_URL;
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
 let pool = null;
 
@@ -95,6 +101,33 @@ async function saveJsonUsers(users) {
   const payload = JSON.stringify({ users }, null, 2);
   await fs.writeFile(AUTH_FILE, payload);
   await fs.writeFile(AUTH_BACKUP_FILE, payload);
+  await commitToGit([AUTH_FILE, AUTH_BACKUP_FILE]);
+}
+
+async function commitToGit(files) {
+  if (!GITHUB_TOKEN) return;
+  try {
+    await execAsync('git', ['config', 'user.email', 'render@jeolim.local'], { cwd: PROJECT_ROOT });
+    await execAsync('git', ['config', 'user.name', 'Render Auto Commit'], { cwd: PROJECT_ROOT });
+    await execAsync('git', ['add', ...files], { cwd: PROJECT_ROOT });
+    try {
+      await execAsync('git', ['commit', '-m', 'auto: update member data'], { cwd: PROJECT_ROOT });
+    } catch {
+      // 변경사항 없음
+    }
+    const remoteResult = await execAsync('git', ['remote', 'get-url', 'origin'], { cwd: PROJECT_ROOT });
+    const remoteUrl = remoteResult.stdout.trim();
+    if (!remoteUrl) return;
+    const authRemote = remoteUrl.replace(/^https:\/\//, `https://${GITHUB_TOKEN}@`);
+    await execAsync('git', ['push', authRemote, 'HEAD:main'], { cwd: PROJECT_ROOT });
+    console.log('[AUTO-COMMIT] Member data pushed to GitHub.');
+  } catch (err) {
+    console.error('[AUTO-COMMIT] Failed:', err.message);
+  }
+}
+
+export async function commitDataFiles(files) {
+  await commitToGit(files);
 }
 
 function rowToUser(row) {

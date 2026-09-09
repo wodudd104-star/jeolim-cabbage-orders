@@ -18,6 +18,7 @@ import {
   countAdmins,
   hashPassword,
   verifyPassword,
+  commitDataFiles,
 } from './src/lib/db.js';
 
 config();
@@ -48,6 +49,7 @@ async function appendSignupLog(user) {
   });
   await fs.mkdir(path.dirname(SIGNUP_LOG_FILE), { recursive: true });
   await fs.writeFile(SIGNUP_LOG_FILE, JSON.stringify(list, null, 2));
+  await commitDataFiles([SIGNUP_LOG_FILE]);
 }
 
 async function loadLegacyJsonUsers() {
