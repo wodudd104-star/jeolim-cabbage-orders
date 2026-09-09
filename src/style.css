@@ -932,4 +932,28 @@ h1 {
   background: #dc2626;
 }
 
+.address-row {
+  display: flex;
+  gap: 8px;
+}
+
+.address-row .input {
+  flex: 1;
+}
+
+.postcode-modal {
+  width: min(500px, 96vw);
+  height: min(600px, 90vh);
+  display: flex;
+  flex-direction: column;
+}
+
+.postcode-wrap {
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+
 

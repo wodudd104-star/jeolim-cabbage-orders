@@ -3,6 +3,12 @@ import * as XLSX from 'xlsx';
 import { Customer, Order } from '../types';
 import { load, save } from '../lib/storage';
 
+declare global {
+  interface Window {
+    daum: any;
+  }
+}
+
 const CUSTOMERS_KEY = 'jeolim-cabbage-customers-v1';
 
 export function loadCustomers(): Customer[] {
@@ -181,6 +187,49 @@ export default function Customers({ orders }: { orders: Order[] }) {
     reader.readAsArrayBuffer(file);
   }
 
+  const [isPostcodeOpen, setIsPostcodeOpen] = useState(false);
+  const postcodeWrapRef = useRef<HTMLDivElement>(null);
+
+  function loadPostcodeScript(): Promise<typeof window.daum> {
+    return new Promise((resolve, reject) => {
+      if (window.daum && window.daum.Postcode) {
+        resolve(window.daum);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+      script.async = true;
+      script.onload = () => resolve(window.daum);
+      script.onerror = () => reject(new Error('주소 검색 스크립트를 불러오지 못했습니다.'));
+      document.head.appendChild(script);
+    });
+  }
+
+  async function openPostcode() {
+    try {
+      const daum = await loadPostcodeScript();
+      setIsPostcodeOpen(true);
+      setTimeout(() => {
+        if (!postcodeWrapRef.current) return;
+        new daum.Postcode({
+          width: '100%',
+          height: '100%',
+          oncomplete: (data: any) => {
+            setForm((prev) => ({ ...prev, address: data.address }));
+            setIsPostcodeOpen(false);
+          },
+          onresize: () => {
+            if (postcodeWrapRef.current) {
+              postcodeWrapRef.current.style.height = '100%';
+            }
+          },
+        }).embed(postcodeWrapRef.current);
+      }, 0);
+    } catch (err) {
+      alert('주소 검색을 불러오는 중 오류가 발생했습니다.');
+    }
+  }
+
   return (
     <div className='customer-shell'>
       <header className='app-header'>
@@ -247,14 +296,23 @@ export default function Customers({ orders }: { orders: Order[] }) {
               </label>
               <label className='full'>
                 주소
-                <input
-                  className='input'
-                  value={form.address}
-                  onChange={(e) =>
-                    setForm({ ...form, address: e.target.value })
-                  }
-                  placeholder='배송 주소'
-                />
+                <div className='address-row'>
+                  <input
+                    className='input'
+                    value={form.address}
+                    onChange={(e) =>
+                      setForm({ ...form, address: e.target.value })
+                    }
+                    placeholder='배송 주소'
+                  />
+                  <button
+                    type='button'
+                    className='btn'
+                    onClick={openPostcode}
+                  >
+                    🔍 주소 검색
+                  </button>
+                </div>
               </label>
               <label className='full'>
                 메모
@@ -280,6 +338,23 @@ export default function Customers({ orders }: { orders: Order[] }) {
             </div>
           </form>
         </section>
+      )}
+
+      {isPostcodeOpen && (
+        <div
+          className='modal-overlay postcode-overlay'
+          onClick={(e) => e.target === e.currentTarget && setIsPostcodeOpen(false)}
+        >
+          <div className='modal panel postcode-modal'>
+            <div className='modal-header'>
+              <h2>주소 검색</h2>
+              <button className='btn icon' onClick={() => setIsPostcodeOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <div ref={postcodeWrapRef} className='postcode-wrap'></div>
+          </div>
+        </div>
       )}
 
       <section className='customer-list'>
