@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { load, save } from '../lib/storage';
 import {
   activateUser,
+  createUser,
   deactivateUser,
   deleteUser,
   demoteUser,
@@ -42,6 +43,15 @@ export default function Admin() {
     { id: string; email: string; role: string; active: boolean; createdAt: string }[]
   >([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({
+    id: '',
+    password: '',
+    confirm: '',
+    email: '',
+    role: 'user',
+    active: true,
+  });
 
   useEffect(() => {
     loadUserList();
@@ -130,6 +140,27 @@ export default function Admin() {
       loadUserList();
     } catch (err: any) {
       setMessage(err.message || '일반 사용자로 변경 실패');
+    }
+  }
+
+  async function handleAddUser(e: React.FormEvent) {
+    e.preventDefault();
+    setMessage('');
+    if (!addForm.id.trim() || !addForm.password.trim() || !addForm.email.trim()) {
+      setMessage('아이디, 비밀번호, 이메일을 모두 입력해주세요.');
+      return;
+    }
+    if (addForm.password !== addForm.confirm) {
+      setMessage('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
+      return;
+    }
+    try {
+      await createUser(addForm.id, addForm.password, addForm.email, addForm.role, addForm.active);
+      setAddForm({ id: '', password: '', confirm: '', email: '', role: 'user', active: true });
+      setIsAddOpen(false);
+      loadUserList();
+    } catch (err: any) {
+      setMessage(err.message || '회원 추가 실패');
     }
   }
 
@@ -229,14 +260,92 @@ export default function Admin() {
       <section className='panel'>
         <div className='admin-section-header'>
           <h2>회원 관리</h2>
-          <button className='btn' onClick={loadUserList} disabled={loadingUsers}>
-            {loadingUsers ? '불러오는 중...' : '새로고침'}
-          </button>
+          <div className='header-actions'>
+            <button className='btn btn-primary' onClick={() => setIsAddOpen(true)}>
+              + 회원 직접 추가
+            </button>
+            <button className='btn' onClick={loadUserList} disabled={loadingUsers}>
+              {loadingUsers ? '불러오는 중...' : '새로고침'}
+            </button>
+          </div>
         </div>
         <p className='panel-hint'>
           회원가입한 사용자는 기본적으로 비활성화 상태입니다. 관리자가 승인(활성화)해야
           로그인할 수 있습니다.
         </p>
+
+        {isAddOpen && (
+          <form onSubmit={handleAddUser} className='admin-form add-user-form'>
+            <div className='form-grid'>
+              <label>
+                아이디
+                <input
+                  className='input'
+                  value={addForm.id}
+                  onChange={(e) => setAddForm({ ...addForm, id: e.target.value })}
+                  placeholder='아이디'
+                />
+              </label>
+              <label>
+                이메일
+                <input
+                  type='email'
+                  className='input'
+                  value={addForm.email}
+                  onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                  placeholder='이메일'
+                />
+              </label>
+              <label>
+                비밀번호
+                <input
+                  type='password'
+                  className='input'
+                  value={addForm.password}
+                  onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
+                  placeholder='비밀번호'
+                />
+              </label>
+              <label>
+                비밀번호 확인
+                <input
+                  type='password'
+                  className='input'
+                  value={addForm.confirm}
+                  onChange={(e) => setAddForm({ ...addForm, confirm: e.target.value })}
+                  placeholder='비밀번호 확인'
+                />
+              </label>
+              <label>
+                권한
+                <select
+                  className='select'
+                  value={addForm.role}
+                  onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
+                >
+                  <option value='user'>사용자</option>
+                  <option value='admin'>관리자</option>
+                </select>
+              </label>
+              <label className='checkbox-label'>
+                <input
+                  type='checkbox'
+                  checked={addForm.active}
+                  onChange={(e) => setAddForm({ ...addForm, active: e.target.checked })}
+                />
+                가입 즉시 활성화
+              </label>
+            </div>
+            <div className='form-actions'>
+              <button type='button' className='btn' onClick={() => setIsAddOpen(false)}>
+                취소
+              </button>
+              <button type='submit' className='btn btn-primary'>
+                회원 추가
+              </button>
+            </div>
+          </form>
+        )}
 
         {users.length === 0 ? (
           <div className='empty'>등록된 회원이 없습니다.</div>

@@ -966,12 +966,29 @@ h1 {
   max-width: 400px;
 }
 
+.admin-form.add-user-form {
+  max-width: 100%;
+  margin-bottom: 16px;
+}
+
+.admin-form.add-user-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
 .admin-form label {
   display: flex;
   flex-direction: column;
   gap: 6px;
   font-weight: 600;
   font-size: 0.9rem;
+}
+
+.admin-form .checkbox-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
 }
 
 .admin-message {

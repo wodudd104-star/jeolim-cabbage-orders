@@ -125,6 +125,17 @@ export async function resetPassword(email: string, code: string, newPassword: st
   return data;
 }
 
+export async function createUser(id: string, password: string, email: string, role: string, active: boolean) {
+  const res = await fetch(getUrl('/api/users'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, password, email, role, active }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || '회원 추가 실패');
+  return data;
+}
+
 export async function updateServerAuth(
   currentId: string,
   currentPassword: string,

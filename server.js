@@ -203,6 +203,32 @@ app.get('/api/users', async (_req, res) => {
   res.json(users);
 });
 
+app.post('/api/users', async (req, res) => {
+  const { id, password, email, role, active } = req.body;
+  if (!id || !password || !email) {
+    return res.status(400).json({ error: '아이디, 비밀번호, 이메일을 모두 입력해주세요.' });
+  }
+  const data = await loadAuthData();
+  if (data.users.some((u) => u.id === id)) {
+    return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
+  }
+  if (data.users.some((u) => u.email === email)) {
+    return res.status(409).json({ error: '이미 사용 중인 이메일입니다.' });
+  }
+  const { salt, hash } = hashPassword(password);
+  data.users.push({
+    id,
+    email,
+    salt,
+    hash,
+    role: role === 'admin' ? 'admin' : 'user',
+    active: !!active,
+    createdAt: new Date().toISOString(),
+  });
+  await saveAuthData(data);
+  res.json({ success: true });
+});
+
 app.post('/api/users/:id/activate', async (req, res) => {
   const data = await loadAuthData();
   const user = data.users.find((u) => u.id === req.params.id);
