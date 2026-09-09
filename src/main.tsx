@@ -712,9 +712,11 @@ export default function App() {
                           <button className='btn icon' onClick={() => startEdit(order)} title='수정'>
                             ✎
                           </button>
-                          <button className='btn icon danger' onClick={() => removeOrder(order.id)} title='삭제'>
-                            ✕
-                          </button>
+                          {isAdmin() && (
+                            <button className='btn icon danger' onClick={() => removeOrder(order.id)} title='삭제'>
+                              ✕
+                            </button>
+                          )}
                         </div>
                       </div>
                       <div className='order-row body'>
