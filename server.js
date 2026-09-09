@@ -42,7 +42,7 @@ app.post('/api/send-sms', async (req, res) => {
   }
 
   try {
-    const response = await fetch('https://api.solapi.com/messages/v4/send', {
+    const response = await fetch('https://api.solapi.com/messages/v4/send-many/detail', {
       method: 'POST',
       headers: {
         Authorization: getAuthHeader(apiKey, apiSecret),
@@ -52,6 +52,7 @@ app.post('/api/send-sms', async (req, res) => {
         messages: validRecipients.map((phone) => ({
           to: phone,
           text: message,
+          type: 'CTA',
           kakaoOptions: {
             pfId: senderKey,
           },
